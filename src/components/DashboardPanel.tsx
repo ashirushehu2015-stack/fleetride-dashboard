@@ -1,0 +1,562 @@
+import React, { useState, useMemo } from 'react';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts';
+import {
+  TrendingUp,
+  DollarSign,
+  Car,
+  Users,
+  Star,
+  Activity,
+  Zap,
+  Leaf,
+  Plus,
+  Play,
+  Sparkles,
+  ArrowRight,
+  MapPin,
+  Calendar,
+  Layers,
+  ArrowUpRight,
+  TrendingDown,
+  Clock
+} from 'lucide-react';
+import { Trip, VehicleType } from '../types';
+import { VEHICLE_CONFIGS, MOCK_DRIVERS, MOCK_PASSENGERS } from '../data';
+
+interface DashboardPanelProps {
+  completedTrips: Trip[];
+  onTriggerRandomTrip: (trip: Trip) => void;
+  isSurgeActive: boolean;
+  setIsSurgeActive: (val: boolean) => void;
+  currentCity: {
+    id: string;
+    name: string;
+    center: { lat: number; lng: number };
+    zoom: number;
+    landmarks: { lat: number; lng: number; label: string }[];
+  };
+}
+
+// Initial realistic data for the charts (if no rides completed yet, to make it look gorgeous)
+const BASE_DAILY_DATA = [
+  { day: 'Mon', revenue: 126000, rides: 28, moto: 5 },
+  { day: 'Tue', revenue: 153000, rides: 34, moto: 8 },
+  { day: 'Wed', revenue: 144000, rides: 31, moto: 6 },
+  { day: 'Thu', revenue: 192000, rides: 42, moto: 11 },
+  { day: 'Fri', revenue: 267000, rides: 58, moto: 18 },
+  { day: 'Sat', revenue: 336000, rides: 74, moto: 24 },
+  { day: 'Sun', revenue: 285000, rides: 62, moto: 19 }
+];
+
+export default function DashboardPanel({
+  completedTrips,
+  onTriggerRandomTrip,
+  isSurgeActive,
+  setIsSurgeActive,
+  currentCity
+}: DashboardPanelProps) {
+  const [activeMetric, setActiveMetric] = useState<'revenue' | 'rides'>('revenue');
+
+  // 1. Calculate dynamic statistics combining static baseline + real-time user-completed rides
+  const stats = useMemo(() => {
+    const userRevenue = completedTrips.reduce((acc, t) => acc + t.price, 0);
+    const userRides = completedTrips.length;
+    const userMotoRides = completedTrips.filter(t => (t.vehicleType as any) === 'Moto').length;
+
+    const baseRevenue = BASE_DAILY_DATA.reduce((acc, d) => acc + d.revenue, 0);
+    const baseRides = BASE_DAILY_DATA.reduce((acc, d) => acc + d.rides, 0);
+    const baseMoto = BASE_DAILY_DATA.reduce((acc, d) => acc + d.moto, 0);
+
+    const totalRevenue = baseRevenue + userRevenue;
+    const totalRides = baseRides + userRides;
+    const totalMoto = baseMoto + userMotoRides;
+
+    // Calculate average rating of completed rides (defaulting to 4.88)
+    const userRatings = completedTrips.filter(t => t.rating !== undefined).map(t => t.rating!);
+    const avgRating = userRatings.length > 0
+      ? userRatings.reduce((a, b) => a + b, 0) / userRatings.length
+      : 4.88;
+
+    return {
+      revenue: totalRevenue,
+      rides: totalRides,
+      motoShare: ((totalMoto / totalRides) * 100).toFixed(1),
+      avgRating,
+      carbonSavedKg: (totalMoto * 1.4 + userRides * 0.2).toFixed(1) // simulated green metric
+    };
+  }, [completedTrips]);
+
+  // 2. Aggregate Chart Data: Day-by-Day Revenue and Bookings
+  const chartData = useMemo(() => {
+    // Distribute user-completed rides over the current day (Sun) or append to data
+    const updatedData = [...BASE_DAILY_DATA];
+    const userRevenue = completedTrips.reduce((acc, t) => acc + t.price, 0);
+    const userRides = completedTrips.length;
+    const userMoto = completedTrips.filter(t => (t.vehicleType as any) === 'Moto').length;
+
+    // Add real-time completed rides to the weekend metrics
+    updatedData[updatedData.length - 1] = {
+      ...updatedData[updatedData.length - 1],
+      revenue: updatedData[updatedData.length - 1].revenue + Math.round(userRevenue),
+      rides: updatedData[updatedData.length - 1].rides + userRides,
+      moto: updatedData[updatedData.length - 1].moto + userMoto
+    };
+
+    return updatedData;
+  }, [completedTrips]);
+
+  // 3. Aggregate Vehicle Type Breakdown
+  const vehicleBreakdownData = useMemo(() => {
+    const counts: Record<VehicleType, number> = {
+      X: 120,
+      Comfort: 64,
+      Black: 32
+    };
+
+    // Add user completed rides
+    completedTrips.forEach(t => {
+      if (counts[t.vehicleType] !== undefined) {
+        counts[t.vehicleType] += 1;
+      }
+    });
+
+    return VEHICLE_CONFIGS.map(v => ({
+      name: v.name,
+      value: counts[v.id as VehicleType],
+      multiplier: v.multiplier
+    }));
+  }, [completedTrips]);
+
+  // 4. Distance Bracket distribution
+  const distanceDistributionData = useMemo(() => {
+    let short = 112; // < 2 miles
+    let medium = 176; // 2 - 5 miles
+    let long = 54; // > 5 miles
+
+    completedTrips.forEach(t => {
+      if (t.distanceMiles < 2) short += 1;
+      else if (t.distanceMiles <= 5) medium += 1;
+      else long += 1;
+    });
+
+    return [
+      { name: 'Short (<2 mi)', value: short, color: '#10b981' },
+      { name: 'Medium (2-5 mi)', value: medium, color: '#3b82f6' },
+      { name: 'Long (>5 mi)', value: long, color: '#f59e0b' }
+    ];
+  }, [completedTrips]);
+
+  // 5. Trigger a random simulation booking to animate charts
+  const triggerRandomBookingSimulation = () => {
+    // Generate random completed trip
+    const randomDriver = MOCK_DRIVERS[Math.floor(Math.random() * MOCK_DRIVERS.length)];
+    const randomPassenger = MOCK_PASSENGERS[Math.floor(Math.random() * MOCK_PASSENGERS.length)];
+    const randomVehicle = VEHICLE_CONFIGS[Math.floor(Math.random() * VEHICLE_CONFIGS.length)];
+
+    const landmarks = currentCity.landmarks && currentCity.landmarks.length > 0
+      ? currentCity.landmarks
+      : [
+          { lat: 9.0625, lng: 7.4912, label: 'Abuja National Mosque' },
+          { lat: 6.4381, lng: 3.4423, label: 'Lekki Toll Plaza' },
+          { lat: 4.8214, lng: 7.0260, label: 'PH Pleasure Park' }
+        ];
+
+    const pickup = landmarks[Math.floor(Math.random() * landmarks.length)];
+    let dropoff = landmarks[Math.floor(Math.random() * landmarks.length)];
+    while (dropoff.label === pickup.label) {
+      dropoff = landmarks[Math.floor(Math.random() * landmarks.length)];
+    }
+
+    const distance = parseFloat((Math.max(0.6, Math.random() * 8.5)).toFixed(1));
+    const baseFare = (4.50 + distance * 1.80) * randomVehicle.multiplier;
+    const finalFare = isSurgeActive ? parseFloat((baseFare * 1.8).toFixed(2)) : parseFloat(baseFare.toFixed(2));
+    const duration = Math.round(distance * 1.5 + 2);
+
+    const ratings = [5, 5, 5, 4, 4, 3];
+    const rating = ratings[Math.floor(Math.random() * ratings.length)];
+
+    const feedbackTexts: Record<number, string[]> = {
+      5: ['Extremely polite driver!', 'Clean vehicle and excellent driving.', 'Arrived sooner than expected.', 'Very comfortable journey.'],
+      4: ['Smooth trip, thank you.', 'Good route selection, missed the gridlock.'],
+      3: ['Average ride, car had a weird scent.', 'Okay experience, but drove a bit slow.']
+    };
+    const reviews = feedbackTexts[rating] || ['Satisfactory travel.'];
+    const review = reviews[Math.floor(Math.random() * reviews.length)];
+
+    const mockTrip: Trip = {
+      id: `sim-${Math.random().toString(36).substring(2, 9)}`,
+      origin: { lat: pickup.lat, lng: pickup.lng, label: pickup.label },
+      destination: { lat: dropoff.lat, lng: dropoff.lng, label: dropoff.label },
+      vehicleType: randomVehicle.id as VehicleType,
+      price: finalFare,
+      distanceMiles: distance,
+      durationMinutes: duration,
+      driver: {
+        name: randomDriver.name,
+        rating: randomDriver.rating,
+        vehicleType: randomVehicle.id as VehicleType,
+        vehicleName: `${randomVehicle.name} • ${randomDriver.vehicleName}`,
+        plateNumber: randomDriver.plateNumber,
+        avatar: randomDriver.avatar,
+        phone: randomDriver.phone,
+        completedTrips: randomDriver.completedTrips + 1
+      },
+      status: 'COMPLETED',
+      progress: 1.0,
+      routePoints: [],
+      currentPosition: { lat: dropoff.lat, lng: dropoff.lng },
+      rating,
+      review,
+      timestamp: new Date().toISOString()
+    };
+
+    onTriggerRandomTrip(mockTrip);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-100 max-h-[85vh] lg:max-h-[90vh]">
+      
+      {/* HEADER BANNER */}
+      <div className="p-4 bg-zinc-950 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="bg-emerald-500 text-zinc-950 p-1.5 rounded-lg">
+            <Activity size={16} />
+          </div>
+          <div>
+            <span className="font-bold text-sm block">System Dashboard</span>
+            <span className="text-[10px] text-zinc-400">Live Ride-Sharing Metrics</span>
+          </div>
+        </div>
+
+        {/* Live Surge Actuator Toggle */}
+        <button
+          onClick={() => setIsSurgeActive(!isSurgeActive)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+            isSurgeActive
+              ? 'bg-amber-500 text-zinc-950 shadow-md animate-pulse'
+              : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
+          }`}
+          id="toggle-dashboard-surge-btn"
+        >
+          <Zap size={12} className={isSurgeActive ? 'fill-zinc-950' : ''} />
+          {isSurgeActive ? 'Surge Active (1.8x)' : 'Trigger Surge (Peak)'}
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        
+        {/* SECTION 1: KEY PERFORMANCE RATINGS (KPI Grid) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          
+          <button
+            onClick={() => setActiveMetric('revenue')}
+            className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+              activeMetric === 'revenue'
+                ? 'bg-zinc-950 border-zinc-950 text-white shadow-md'
+                : 'bg-zinc-50 border-zinc-100 hover:bg-zinc-100/50'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'revenue' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Gross Revenue
+              </span>
+              <DollarSign size={14} className={activeMetric === 'revenue' ? 'text-emerald-400' : 'text-zinc-400'} />
+            </div>
+            <div className="text-lg font-black">₦{stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[9px] mt-1 text-emerald-500 flex items-center gap-0.5 font-medium">
+              <ArrowUpRight size={10} /> +12.4% vs last week
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveMetric('rides')}
+            className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+              activeMetric === 'rides'
+                ? 'bg-zinc-950 border-zinc-950 text-white shadow-md'
+                : 'bg-zinc-50 border-zinc-100 hover:bg-zinc-100/50'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'rides' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                Completed Trips
+              </span>
+              <Car size={14} className={activeMetric === 'rides' ? 'text-blue-400' : 'text-zinc-400'} />
+            </div>
+            <div className="text-lg font-black">{stats.rides} rides</div>
+            <div className="text-[9px] mt-1 text-emerald-500 flex items-center gap-0.5 font-medium">
+              <ArrowUpRight size={10} /> +8.1% demand index
+            </div>
+          </button>
+
+          <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-left">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                Average Rating
+              </span>
+              <Star size={14} className="text-yellow-500 fill-yellow-500" />
+            </div>
+            <div className="text-lg font-black">{stats.avgRating.toFixed(2)} ★</div>
+            <div className="text-[9px] mt-1 text-emerald-600 font-medium">
+              Top 1% Driver rating
+            </div>
+          </div>
+
+          <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-left">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                CO2 Saved (Est)
+              </span>
+              <Leaf size={14} className="text-emerald-500" />
+            </div>
+            <div className="text-lg font-black text-emerald-600">{stats.carbonSavedKg} kg</div>
+            <div className="text-[9px] mt-1 text-zinc-500 font-medium">
+              Powered by Moto & EVs
+            </div>
+          </div>
+
+        </div>
+
+        {/* SECTION 2: INTERACTIVE SIMULATION GENERATOR */}
+        <div className="bg-emerald-500/5 border border-emerald-200/50 rounded-xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="space-y-1 text-left">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h4 className="font-bold text-xs text-zinc-800">Dynamic Live Simulator Controller</h4>
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed max-w-xl">
+              Want to see the charts animate immediately? Click below to instantly generate a random completed trip in the city database.
+            </p>
+          </div>
+
+          <button
+            onClick={triggerRandomBookingSimulation}
+            className="bg-zinc-950 hover:bg-zinc-900 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm flex items-center gap-1.5 shrink-0 transition cursor-pointer"
+            id="trigger-random-trip-sim-btn"
+          >
+            <Plus size={14} /> Add Simulated Ride
+          </button>
+        </div>
+
+        {/* SECTION 3: RECHARTS GRAPHICAL TREND */}
+        <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="font-bold text-xs text-zinc-800">
+                {activeMetric === 'revenue' ? 'Revenue Generation Index' : 'Daily Trip Volume Distribution'}
+              </h4>
+              <p className="text-[10px] text-zinc-400">Weekly breakdown including real-time simulation updates</p>
+            </div>
+            <span className="text-[10px] bg-white border border-zinc-200 px-2.5 py-1 rounded-full font-mono text-zinc-500 font-medium">
+              7-Day Cycle
+            </span>
+          </div>
+
+          <div className="h-[220px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'} stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
+                  labelStyle={{ fontWeight: 'bold', fontSize: '11px', color: '#91919a' }}
+                  itemStyle={{ fontSize: '12px' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={activeMetric}
+                  name={activeMetric === 'revenue' ? 'Revenue (₦)' : 'Trips Completed'}
+                  stroke={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'}
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorMetric)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* SECTION 4: DEMAND CATEGORIZATION GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Bar Chart: Vehicle Class breakdown */}
+          <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4 text-left">
+            <div>
+              <h4 className="font-bold text-xs text-zinc-800">Demand Share by Car Class</h4>
+              <p className="text-[10px] text-zinc-400 mb-3">Popularity breakdown of booking categories</p>
+            </div>
+            
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={vehicleBreakdownData} layout="vertical" margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e4e4e7" />
+                  <XAxis type="number" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} width={65} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
+                    itemStyle={{ fontSize: '11px' }}
+                  />
+                  <Bar dataKey="value" name="Rides Ordered" fill="#18181b" radius={[0, 4, 4, 0]}>
+                    {vehicleBreakdownData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#18181b' : index === 1 ? '#3b82f6' : index === 2 ? '#a855f7' : index === 3 ? '#e11d48' : '#facc15'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Pie Chart: Trip Distance bracket */}
+          <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4 text-left">
+            <div>
+              <h4 className="font-bold text-xs text-zinc-800">Trip Distance Distribution</h4>
+              <p className="text-[10px] text-zinc-400 mb-3">Breakdown of ride length categories</p>
+            </div>
+
+            <div className="h-[200px] w-full flex items-center justify-between">
+              <div className="w-[60%] h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={distanceDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {distanceDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
+                      itemStyle={{ fontSize: '11px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Pie Legends custom */}
+              <div className="w-[40%] space-y-3 pl-2 text-xs">
+                {distanceDistributionData.map((item) => (
+                  <div key={item.name} className="flex flex-col">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="font-bold text-zinc-700 text-[10px]">{item.name}</span>
+                    </div>
+                    <span className="font-extrabold text-zinc-800 text-xs pl-4">{item.value} bookings</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* SECTION 5: RECENT TRIPS & LIVE ACTIVITY */}
+        <div className="space-y-3 text-left">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Recent Trips & Live Activity</h4>
+            <span className="text-[10px] text-zinc-500 font-semibold">{completedTrips.length} Total Trips</span>
+          </div>
+
+          {completedTrips.length === 0 ? (
+            <div className="py-8 text-center border-2 border-dashed border-zinc-150 rounded-xl bg-zinc-50">
+              <Calendar size={24} className="mx-auto text-zinc-300 mb-2" />
+              <h5 className="text-xs font-bold text-zinc-700">No recent trips yet</h5>
+              <p className="text-[10px] text-zinc-400 max-w-[200px] mx-auto mt-1">
+                Completed user bookings or simulated entries will populate this activity log!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {completedTrips.slice().reverse().map((trip) => {
+                const formattedDate = trip.timestamp 
+                  ? (trip.timestamp.includes('T') 
+                    ? new Date(trip.timestamp).toLocaleDateString() + ' ' + new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : trip.timestamp)
+                  : new Date().toLocaleTimeString();
+                return (
+                  <div key={trip.id} className="bg-zinc-50 border border-zinc-150 rounded-xl p-3 flex flex-col sm:flex-row justify-between gap-3 text-xs shadow-sm hover:border-zinc-300 transition">
+                    <div className="flex gap-3">
+                      <img
+                        src={trip.driver.avatar}
+                        alt={trip.driver.name}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-zinc-200"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-zinc-800">{trip.driver.name}</span>
+                          <span className="text-[9px] bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded font-mono font-bold uppercase shrink-0">
+                            {trip.vehicleType}
+                          </span>
+                          {trip.rating && (
+                            <span className="flex items-center text-amber-500 text-[10px] font-bold">
+                              <Star size={10} className="fill-amber-500 mr-0.5" />
+                              {trip.rating}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p className="text-[10px] text-zinc-400 font-medium truncate mt-0.5">
+                          {trip.origin.label} → {trip.destination.label}
+                        </p>
+
+                        <div className="flex items-center gap-1 text-[9px] text-zinc-400 font-mono mt-1">
+                          <Clock size={10} className="text-zinc-400" />
+                          <span>{formattedDate}</span>
+                        </div>
+
+                        {trip.review && (
+                          <p className="text-[10px] text-zinc-500 italic mt-1 leading-relaxed border-l-2 border-zinc-200 pl-1.5">
+                            "{trip.review}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-zinc-200">
+                      <div className="font-black text-emerald-600 text-sm">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-[9px] text-zinc-400 font-mono mt-0.5">
+                        {trip.distanceMiles}km • {trip.durationMinutes}m
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* FOOTER */}
+      <div className="bg-zinc-50 p-2 text-center text-[9px] text-zinc-400 border-t border-zinc-150 font-mono">
+        Active demand model parameters updated in real-time
+      </div>
+    </div>
+  );
+}

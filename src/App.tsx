@@ -1,0 +1,874 @@
+import React, { useState, useEffect } from 'react';
+import { Location, Trip, ChatMessage, UserProfile, TripStatus } from './types';
+import { CITIES, VEHICLE_CONFIGS, MOCK_DRIVERS, MOCK_DRIVER_CHATBOT_PHRASES } from './data';
+import MapContainer from './components/MapContainer';
+import RiderPanel from './components/RiderPanel';
+import DriverPanel from './components/DriverPanel';
+import SettingsPanel from './components/SettingsPanel';
+import DashboardPanel from './components/DashboardPanel';
+import UserManagementPanel from './components/UserManagementPanel';
+import LandingPage from './components/LandingPage';
+import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn } from 'lucide-react';
+// @ts-ignore
+import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
+
+export default function App() {
+  // 1. Core State Managers
+  const [currentCity, setCurrentCity] = useState(CITIES[0]); // Default NYC
+  const [origin, setOrigin] = useState<Location | null>(null);
+  const [destination, setDestination] = useState<Location | null>(null);
+  const [travelMode, setTravelMode] = useState<'municipal' | 'interstate'>('municipal');
+
+  // User Management State (linked to localStorage for maximum persistence!)
+  const [passengers, setPassengers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('zamfara_passengers');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'rider-1',
+        name: 'Ashiru Shehu',
+        rating: 4.92,
+        balance: 50000.00,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        completedTrips: 12,
+        status: 'ACTIVE',
+        joinedDate: 'Jul 1, 2026',
+        email: 'ashiru@transit.ng',
+        phone: '+234 803 111 2233'
+      },
+      {
+        id: 'rider-2',
+        name: 'Bello Matawalle',
+        rating: 4.85,
+        balance: 12500.00,
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+        completedTrips: 8,
+        status: 'ACTIVE',
+        joinedDate: 'Jun 28, 2026',
+        email: 'bello@transit.ng',
+        phone: '+234 806 444 5566'
+      },
+      {
+        id: 'rider-3',
+        name: 'Diana Prince',
+        rating: 5.0,
+        balance: 120000.00,
+        avatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&q=80&w=150',
+        completedTrips: 45,
+        status: 'ACTIVE',
+        joinedDate: 'May 15, 2026',
+        email: 'diana@transit.ng',
+        phone: '+234 813 999 8888'
+      }
+    ];
+  });
+
+  const [drivers, setDrivers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('zamfara_drivers');
+    if (saved) return JSON.parse(saved);
+    return MOCK_DRIVERS.map((d, index) => ({
+      id: `driver-${index + 1}`,
+      name: d.name,
+      rating: d.rating,
+      vehicleType: (index % 3 === 2 ? 'Black' : index % 3 === 1 ? 'Comfort' : 'X'),
+      vehicleName: d.vehicleName,
+      plateNumber: d.plateNumber,
+      avatar: d.avatar,
+      phone: d.phone,
+      completedTrips: d.completedTrips,
+      isVerified: true,
+      status: 'ACTIVE',
+      joinedDate: 'May 1, 2026'
+    }));
+  });
+
+  const [admins, setAdmins] = useState<any[]>(() => {
+    const saved = localStorage.getItem('zamfara_admins');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'admin-1',
+        name: 'Shehu Gusau',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+        role: 'Super Admin',
+        status: 'ACTIVE',
+        email: 'shehu.admin@nigeria.gov.ng',
+        actionsCount: 5
+      },
+      {
+        id: 'admin-2',
+        name: 'Ashiru Shehu (Admin)',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        role: 'Fleet Manager',
+        status: 'ACTIVE',
+        email: 'ashiru.shehu@nigeria.gov.ng',
+        actionsCount: 18
+      }
+    ];
+  });
+
+  const [auditLogs, setAuditLogs] = useState<any[]>(() => {
+    const saved = localStorage.getItem('zamfara_audit_logs');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'log-1',
+        timestamp: new Date(Date.now() - 3600000).toLocaleTimeString(),
+        category: 'SYSTEM',
+        message: 'Nigeria operations engine initialized successfully.'
+      },
+      {
+        id: 'log-2',
+        timestamp: new Date(Date.now() - 1800000).toLocaleTimeString(),
+        category: 'SYSTEM',
+        message: 'Federal GPS tracking nodes calibrated across all metropolitan sectors.'
+      }
+    ];
+  });
+
+  const addAuditLog = (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => {
+    const newLog = {
+      id: 'log-' + Math.random().toString(36).substr(2, 9),
+      timestamp: new Date().toLocaleTimeString(),
+      category,
+      message
+    };
+    setAuditLogs((prev) => [newLog, ...prev.slice(0, 49)]);
+  };
+
+  // Sync state changes to local storage
+  useEffect(() => {
+    localStorage.setItem('zamfara_passengers', JSON.stringify(passengers));
+  }, [passengers]);
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_drivers', JSON.stringify(drivers));
+  }, [drivers]);
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_admins', JSON.stringify(admins));
+  }, [admins]);
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  const [profile, setProfile] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('zamfara_passengers');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.length > 0) {
+        return {
+          name: parsed[0].name,
+          rating: parsed[0].rating,
+          balance: parsed[0].balance,
+          isDriver: false,
+          avatar: parsed[0].avatar
+        };
+      }
+    }
+    return {
+      name: 'Ashiru Shehu',
+      rating: 4.92,
+      balance: 50000.00,
+      isDriver: false,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    };
+  });
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'rider' | 'driver' | 'settings' | 'users'>('dashboard');
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
+    const saved = localStorage.getItem('zamfara_view_mode');
+    return (saved as 'landing' | 'app') || 'landing';
+  });
+  const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
+  const [isSurgeActive, setIsSurgeActive] = useState<boolean>(false);
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // Driver positions (used for driver mode navigation)
+  const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Animated Roaming street vehicles (ambient canvas traffic)
+  const [roamingCars, setRoamingCars] = useState<any[]>([]);
+
+  // Clear state on city change
+  const handleCityChange = (cityId: string) => {
+    const found = CITIES.find((c) => c.id === cityId);
+    if (found) {
+      setCurrentCity(found);
+      setOrigin(null);
+      setDestination(null);
+      setTrip(null);
+      setChatMessages([]);
+    }
+  };
+
+  // 2. Initialize Roaming Cars whenever the current city changes
+  useEffect(() => {
+    if (!currentCity) return;
+    const cars = currentCity.landmarks.slice(0, 5).map((lm, idx) => ({
+      id: `roamer-${idx}`,
+      lat: lm.lat + (Math.random() - 0.5) * 0.008,
+      lng: lm.lng + (Math.random() - 0.5) * 0.008,
+      angle: Math.random() * Math.PI * 2,
+      type: idx % 2 === 0 ? 'cab' : 'moto',
+    }));
+    setRoamingCars(cars);
+  }, [currentCity]);
+
+  // Ambient Roaming cars position ticker loop (300ms)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRoamingCars((prev) =>
+        prev.map((car) => {
+          const speed = 0.00012; // Coordinate increment step
+          let nextLat = car.lat + Math.sin(car.angle) * speed;
+          let nextLng = car.lng + Math.cos(car.angle) * speed;
+
+          const maxDelta = 0.035; // Bound boundary delta
+          let nextAngle = car.angle;
+
+          if (
+            Math.abs(nextLat - currentCity.center.lat) > maxDelta ||
+            Math.abs(nextLng - currentCity.center.lng) > maxDelta
+          ) {
+            // Point the vehicle back toward the center of city
+            nextAngle =
+              Math.atan2(currentCity.center.lat - car.lat, currentCity.center.lng - car.lng) +
+              (Math.random() - 0.5) * 0.4;
+          } else if (Math.random() < 0.04) {
+            // 4% chance to make minor lane wander turns
+            nextAngle += (Math.random() - 0.5) * 1.2;
+          }
+
+          return {
+            ...car,
+            lat: nextLat,
+            lng: nextLng,
+            angle: nextAngle,
+          };
+        })
+      );
+    }, 350);
+
+    return () => clearInterval(interval);
+  }, [currentCity]);
+
+  // ==========================================
+  // 3. RIDER MODE SIMULATION STATE TICKER
+  // ==========================================
+  const handleBookTrip = (vehicleType: string, price: number, distance: number, duration: number) => {
+    if (!origin || !destination) return;
+
+    // Phase 1: Search mode
+    const newTrip: Trip = {
+      id: Math.random().toString(36).substr(2, 9),
+      origin,
+      destination,
+      vehicleType: vehicleType as any,
+      price,
+      distanceMiles: distance,
+      durationMinutes: duration,
+      driver: {
+        name: 'Michael Scott',
+        rating: 4.85,
+        vehicleType: vehicleType as any,
+        vehicleName: 'Silver Chrysler Sebring',
+        plateNumber: 'SCRN-1',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+        phone: '+1 (555) 321-4567',
+        completedTrips: 1140,
+      },
+      status: 'SEARCHING',
+      progress: 0,
+      routePoints: [],
+      currentPosition: origin,
+      timestamp: new Date().toISOString(),
+    };
+
+    setTrip(newTrip);
+    setChatMessages([]);
+
+    // Step 2: Auto match driver after 3 seconds
+    setTimeout(() => {
+      // Pick an active, verified driver from dynamic user state
+      const activeVerifiedDrivers = drivers.filter((d: any) => d.isVerified && d.status === 'ACTIVE');
+      let matchedDriver;
+
+      if (activeVerifiedDrivers.length > 0) {
+        // Find one matching the vehicleType if possible, otherwise any verified driver
+        const matchingType = activeVerifiedDrivers.filter((d: any) => d.vehicleType === vehicleType);
+        const selectedDrv = matchingType.length > 0 
+          ? matchingType[Math.floor(Math.random() * matchingType.length)] 
+          : activeVerifiedDrivers[Math.floor(Math.random() * activeVerifiedDrivers.length)];
+        
+        matchedDriver = {
+          name: selectedDrv.name,
+          rating: selectedDrv.rating,
+          vehicleType: vehicleType as any,
+          vehicleName: selectedDrv.vehicleName,
+          plateNumber: selectedDrv.plateNumber,
+          avatar: selectedDrv.avatar,
+          phone: selectedDrv.phone,
+          completedTrips: selectedDrv.completedTrips
+        };
+      } else {
+        // Fallback to static config
+        const randomDriverIdx = Math.floor(Math.random() * MOCK_DRIVERS.length);
+        const matchedMock = MOCK_DRIVERS[randomDriverIdx];
+        const vehicleConf = VEHICLE_CONFIGS.find((v) => v.id === vehicleType);
+        matchedDriver = {
+          ...matchedMock,
+          vehicleType: vehicleType as any,
+          vehicleName: matchedMock.vehicleName.includes('Sebring')
+            ? `${vehicleConf?.name || 'UberX'} • ${matchedMock.vehicleName}`
+            : `${vehicleConf?.name || 'UberX'} • ${matchedMock.vehicleName}`,
+        };
+      }
+
+      setTrip((prev) => {
+        if (!prev) return null;
+        // Position driver vehicle slightly away initially for Pick-up drive-in effect
+        const driverStartPos = {
+          lat: prev.origin.lat + (Math.random() - 0.5) * 0.015,
+          lng: prev.origin.lng + (Math.random() - 0.5) * 0.015,
+        };
+
+        return {
+          ...prev,
+          driver: matchedDriver,
+          status: 'ACCEPTED',
+          currentPosition: driverStartPos,
+        };
+      });
+
+      // Send initial driver greet message
+      const driverPhrases = MOCK_DRIVER_CHATBOT_PHRASES.ACCEPTED;
+      const initialGreet = driverPhrases[Math.floor(Math.random() * driverPhrases.length)];
+
+      setTimeout(() => {
+        setChatMessages([
+          {
+            id: 'init-greet',
+            sender: 'driver',
+            text: initialGreet,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }, 1000);
+    }, 3000);
+  };
+
+  // Automated Active Ride Simulation Telemetry Ticker (Runs when trip status changes)
+  useEffect(() => {
+    if (!trip) return;
+    let timer: NodeJS.Timeout;
+
+    // Helper: Linear coordinate interpolation
+    const interpolate = (start: { lat: number; lng: number }, end: { lat: number; lng: number }, factor: number) => {
+      return {
+        lat: start.lat + (end.lat - start.lat) * factor,
+        lng: start.lng + (end.lng - start.lng) * factor,
+      };
+    };
+
+    // DRIVER EN ROUTE TO PICKUP (Leg 1)
+    if (trip.status === 'ACCEPTED' || trip.status === 'PICKING_UP') {
+      const startPos = { ...trip.currentPosition };
+      const targetPos = { lat: trip.origin.lat, lng: trip.origin.lng };
+
+      let localFactor = 0;
+      timer = setInterval(() => {
+        localFactor += 0.2; // 5 steps
+        if (localFactor >= 1.0) {
+          clearInterval(timer);
+          setTrip((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              status: 'ARRIVED',
+              progress: 1.0,
+              currentPosition: targetPos,
+            };
+          });
+
+          // Send "I have arrived" greeting
+          const arrivedPhrases = MOCK_DRIVER_CHATBOT_PHRASES.ARRIVED;
+          const greetArrive = arrivedPhrases[Math.floor(Math.random() * arrivedPhrases.length)]
+            .replace('[CAR]', trip.driver.vehicleName.split('•')[1] || 'vehicle');
+
+          setTimeout(() => {
+            setChatMessages((prevMsg) => [
+              ...prevMsg,
+              {
+                id: `arrive-greet-${Date.now()}`,
+                sender: 'driver',
+                text: greetArrive,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+          }, 1000);
+        } else {
+          setTrip((prev) => {
+            if (!prev) return null;
+            const currentInt = interpolate(startPos, targetPos, localFactor);
+            return {
+              ...prev,
+              status: 'PICKING_UP',
+              progress: localFactor,
+              currentPosition: currentInt,
+            };
+          });
+        }
+      }, 1800);
+    }
+
+    // WAITING FOR BOARDING AT PICKUP SPOT
+    if (trip.status === 'ARRIVED') {
+      // Auto transition to "IN_PROGRESS" after passenger boards (4 seconds)
+      timer = setTimeout(() => {
+        setTrip((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            status: 'TRIP_IN_PROGRESS',
+            progress: 0.0,
+            currentPosition: { lat: prev.origin.lat, lng: prev.origin.lng },
+          };
+        });
+
+        // Send travel dialogue
+        const ridePhrases = MOCK_DRIVER_CHATBOT_PHRASES.TRIP_IN_PROGRESS;
+        const greetTrip = ridePhrases[Math.floor(Math.random() * ridePhrases.length)]
+          .replace('[ETA]', String(trip.durationMinutes));
+
+        setTimeout(() => {
+          setChatMessages((prevMsg) => [
+            ...prevMsg,
+            {
+              id: `trip-greet-${Date.now()}`,
+              sender: 'driver',
+              text: greetTrip,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }, 1500);
+      }, 4500);
+    }
+
+    // TRIP TO DESTINATION ACTIVE DRIVE (Leg 2)
+    if (trip.status === 'TRIP_IN_PROGRESS') {
+      const startPos = { lat: trip.origin.lat, lng: trip.origin.lng };
+      const targetPos = { lat: trip.destination.lat, lng: trip.destination.lng };
+
+      let localFactor = 0;
+      timer = setInterval(() => {
+        localFactor += 0.15; // ~7 steps
+        if (localFactor >= 1.0) {
+          clearInterval(timer);
+          // Complete and charge passenger account
+          setProfile((prev) => {
+            const nextBal = parseFloat((prev.balance - trip.price).toFixed(2));
+            
+            // Sync inside passengers list
+            setPassengers((prevList) => prevList.map(p => {
+              if (p.name === prev.name) {
+                return {
+                  ...p,
+                  balance: nextBal,
+                  completedTrips: p.completedTrips + 1
+                };
+              }
+              return p;
+            }));
+            
+            return {
+              ...prev,
+              balance: nextBal,
+            };
+          });
+
+          // Sync inside drivers list
+          setDrivers((prevList) => prevList.map(d => {
+            if (d.name === trip.driver.name) {
+              return {
+                ...d,
+                completedTrips: d.completedTrips + 1
+              };
+            }
+            return d;
+          }));
+
+          // Add dynamic system log
+          addAuditLog('SYSTEM', `Trip completed! Charged Rider ${profile.name} ₦${trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Driver ${trip.driver.name} credited.`);
+
+          setTrip((prev) => {
+            if (!prev) return null;
+            const completedTrip = {
+              ...prev,
+              status: 'COMPLETED' as const,
+              progress: 1.0,
+              currentPosition: targetPos,
+              rating: 5,
+              review: 'Great ride!',
+            };
+            setCompletedTrips((current) => [...current, completedTrip]);
+            return completedTrip;
+          });
+        } else {
+          setTrip((prev) => {
+            if (!prev) return null;
+            const currentInt = interpolate(startPos, targetPos, localFactor);
+            return {
+              ...prev,
+              status: 'TRIP_IN_PROGRESS',
+              progress: localFactor,
+              currentPosition: currentInt,
+            };
+          });
+        }
+      }, 2000);
+    }
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(timer);
+    };
+  }, [trip?.status]);
+
+  // Cancel ongoing trip
+  const handleCancelTrip = () => {
+    setTrip(null);
+    setChatMessages([]);
+  };
+
+  const handleCompleteTripRating = (rating: number, reviewText: string) => {
+    // Save rating summary to analytics list, then return to idle state
+    if (trip) {
+      setCompletedTrips((current) => {
+        const index = current.findIndex(t => t.id === trip.id);
+        if (index !== -1) {
+          const updated = [...current];
+          updated[index] = {
+            ...updated[index],
+            rating,
+            review: reviewText
+          };
+          return updated;
+        } else {
+          return [...current, { ...trip, rating, review: reviewText, status: 'COMPLETED' as const }];
+        }
+      });
+    }
+    setTrip(null);
+    setChatMessages([]);
+    setOrigin(null);
+    setDestination(null);
+  };
+
+  // Passenger Sends chat message, automatic driver response trigger
+  const handleSendMessage = (text: string) => {
+    const newMsg: ChatMessage = {
+      id: Math.random().toString(),
+      sender: 'rider',
+      text,
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages((prev) => [...prev, newMsg]);
+
+    // Driver automatic reply simulator
+    if (trip) {
+      setTimeout(() => {
+        let reply = '';
+        const currentStage = trip.status;
+
+        if (text.toLowerCase().includes('hello') || text.toLowerCase().includes('hi')) {
+          reply = `Hello! I'm focused on driving, but navigating to destination safely. See you soon!`;
+        } else if (text.toLowerCase().includes('where') || text.toLowerCase().includes('far')) {
+          reply = `Checking GPS: The traffic isn't too bad, we should arrive in about ${Math.max(
+            1,
+            Math.round(trip.durationMinutes * (1 - trip.progress))
+          )} minutes!`;
+        } else if (text.toLowerCase().includes('ac') || text.toLowerCase().includes('cold') || text.toLowerCase().includes('hot')) {
+          reply = `Got it! Adjusting climate controls immediately for your comfort.`;
+        } else {
+          // Fallback based on stage
+          const phraseBank = MOCK_DRIVER_CHATBOT_PHRASES[currentStage] || MOCK_DRIVER_CHATBOT_PHRASES.ACCEPTED;
+          reply = phraseBank[Math.floor(Math.random() * phraseBank.length)]
+            .replace('[CAR]', trip.driver.vehicleName.split('•')[1] || 'vehicle')
+            .replace('[ETA]', String(Math.max(1, Math.round(trip.durationMinutes * (1 - trip.progress)))));
+        }
+
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: `reply-${Date.now()}`,
+            sender: 'driver',
+            text: reply,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }, 1500);
+    }
+  };
+
+  const handleTriggerRandomTrip = (mockTrip: Trip) => {
+    setCompletedTrips((prev) => [...prev, mockTrip]);
+    // Set the simulated completed trip as the active map view so we see its endpoints!
+    setTrip(mockTrip);
+  };
+
+  if (currentView === 'landing') {
+    return (
+      <LandingPage
+        passengers={passengers}
+        setPassengers={setPassengers}
+        drivers={drivers}
+        setDrivers={setDrivers}
+        admins={admins}
+        setAdmins={setAdmins}
+        onLoginSuccess={(role, userProfile, activeTabName) => {
+          setProfile(userProfile);
+          setActiveTab(activeTabName);
+          setCurrentView('app');
+          localStorage.setItem('zamfara_view_mode', 'app');
+        }}
+        addAuditLog={addAuditLog}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col font-sans selection:bg-zinc-800 selection:text-white" id="uber-simulator-root">
+      
+      {/* GLOBAL HIGH-CONTRAST HEADER */}
+      <header className="bg-zinc-950 border-b border-zinc-900 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-lg border border-zinc-800">
+            <img 
+              src={zamfaraLogo} 
+              alt="Zamfara logo" 
+              className="w-7 h-7 object-contain" 
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div>
+            <h1 className="text-white font-extrabold text-base leading-none">ZamTaxi Console</h1>
+            <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mt-1">
+              Official Zamfara State Taxi Service
+            </p>
+          </div>
+        </div>
+
+        {/* Core Tab Switch Control */}
+        <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800">
+          <button
+            onClick={() => {
+              setActiveTab('dashboard');
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'dashboard'
+                ? 'bg-white text-zinc-950 shadow-md'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            id="tab-select-dashboard"
+          >
+            <LayoutDashboard size={13} />
+            Dashboard
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('rider');
+              setProfile((p) => ({ ...p, isDriver: false }));
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'rider'
+                ? 'bg-white text-zinc-950 shadow-md'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            id="tab-select-rider"
+          >
+            <User size={13} />
+            Rider Mode
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('driver');
+              setProfile((p) => ({ ...p, isDriver: true }));
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'driver'
+                ? 'bg-white text-zinc-950 shadow-md'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            id="tab-select-driver"
+          >
+            <Car size={13} />
+            Driver Mode
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('users');
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-white text-zinc-950 shadow-md'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+            id="tab-select-users"
+          >
+            <ShieldCheck size={13} />
+            User Hub
+          </button>
+        </div>
+
+        {/* Secondary Navigation & Balance HUD */}
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Account Balance</span>
+            <div className="text-emerald-500 font-extrabold text-sm">₦{profile.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`p-2.5 rounded-xl border transition cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-zinc-800 text-white border-zinc-700 shadow-md'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white hover:bg-zinc-850'
+            }`}
+            title="Settings & Credentials"
+            id="tab-select-settings"
+          >
+            <Settings size={16} />
+          </button>
+
+          <button
+            onClick={() => {
+              setCurrentView('landing');
+              localStorage.setItem('zamfara_view_mode', 'landing');
+              addAuditLog('SYSTEM', `${profile.name} logged out of current session. Returned to Landing Portal.`);
+            }}
+            className="p-2.5 rounded-xl border bg-zinc-900 text-red-400 border-zinc-800 hover:text-red-300 hover:bg-zinc-850 transition cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs"
+            title="Log Out to Landing"
+            id="btn-logout-portal"
+          >
+            <LogIn size={15} className="rotate-180" />
+            <span className="hidden sm:inline">Log Out</span>
+          </button>
+        </div>
+      </header>
+
+      {/* CORE TWO-COLUMN MAIN FRAME */}
+      <main className="flex-1 w-full max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch overflow-hidden">
+        
+        {/* LEFT COLUMN: INTERACTIVE INPUT PANEL (4 cols) */}
+        <div className="lg:col-span-5 xl:col-span-4 h-full flex flex-col justify-start">
+          {activeTab === 'dashboard' && (
+            <DashboardPanel
+              completedTrips={completedTrips}
+              onTriggerRandomTrip={handleTriggerRandomTrip}
+              isSurgeActive={isSurgeActive}
+              setIsSurgeActive={setIsSurgeActive}
+              currentCity={currentCity}
+            />
+          )}
+
+          {activeTab === 'rider' && (
+            <RiderPanel
+              city={currentCity}
+              cities={CITIES}
+              onCityChange={handleCityChange}
+              origin={origin}
+              destination={destination}
+              setOrigin={setOrigin}
+              setDestination={setDestination}
+              trip={trip}
+              onBookTrip={handleBookTrip}
+              onCancelTrip={handleCancelTrip}
+              onCompleteTripRating={handleCompleteTripRating}
+              chatMessages={chatMessages}
+              onSendMessage={handleSendMessage}
+              isSurgeActive={isSurgeActive}
+              travelMode={travelMode}
+              setTravelMode={setTravelMode}
+            />
+          )}
+
+          {activeTab === 'driver' && (
+            <DriverPanel
+              city={currentCity}
+              profile={profile}
+              setProfile={setProfile}
+              driverPosition={driverPosition}
+              setDriverPosition={setDriverPosition}
+              onAcceptTripByDriver={() => {}} // simulated locally inside panel
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsPanel
+              profile={profile}
+              setProfile={setProfile}
+              onClearHistory={() => {
+                setOrigin(null);
+                setDestination(null);
+                setTrip(null);
+                setChatMessages([]);
+              }}
+            />
+          )}
+
+          {activeTab === 'users' && (
+            <UserManagementPanel
+              activeProfile={profile}
+              setActiveProfile={setProfile}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              passengers={passengers}
+              setPassengers={setPassengers}
+              drivers={drivers}
+              setDrivers={setDrivers}
+              admins={admins}
+              setAdmins={setAdmins}
+              auditLogs={auditLogs}
+              addAuditLog={addAuditLog}
+              isSurgeActive={isSurgeActive}
+              setIsSurgeActive={setIsSurgeActive}
+              completedTrips={completedTrips}
+            />
+          )}
+        </div>
+
+        {/* RIGHT COLUMN: LARGE MAP CONTAINER (8 cols) */}
+        <div className="lg:col-span-7 xl:col-span-8 min-h-[400px] lg:h-full relative flex flex-col">
+          <MapContainer
+            city={currentCity}
+            origin={origin}
+            destination={destination}
+            setOrigin={setOrigin}
+            setDestination={setDestination}
+            trip={trip}
+            isDriverMode={activeTab === 'driver'}
+            driverPosition={driverPosition}
+            roamingCars={roamingCars}
+            travelMode={travelMode}
+          />
+        </div>
+      </main>
+
+      {/* FOOTER METRICS HUD */}
+      <footer className="bg-zinc-950 border-t border-zinc-900 px-6 py-3.5 text-zinc-500 text-xs flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck size={14} className="text-emerald-500" />
+          <span>Secured Sandboxed Simulation Environment</span>
+        </div>
+        <div className="flex gap-4 font-mono text-[10px] tracking-tight">
+          <span>SERVER TIME: {new Date().toLocaleTimeString()}</span>
+          <span>CITY ID: {currentCity.id.toUpperCase()}</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
