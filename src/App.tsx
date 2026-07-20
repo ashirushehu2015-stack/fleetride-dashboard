@@ -8,7 +8,7 @@ import SettingsPanel from './components/SettingsPanel';
 import DashboardPanel from './components/DashboardPanel';
 import UserManagementPanel from './components/UserManagementPanel';
 import LandingPage from './components/LandingPage';
-import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn } from 'lucide-react';
+import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert } from 'lucide-react';
 // @ts-ignore
 import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
 
@@ -154,29 +154,99 @@ export default function App() {
   }, [auditLogs]);
 
   const [profile, setProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('zamfara_passengers');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.length > 0) {
-        return {
-          name: parsed[0].name,
-          rating: parsed[0].rating,
-          balance: parsed[0].balance,
-          isDriver: false,
-          avatar: parsed[0].avatar
-        };
+    const savedRole = localStorage.getItem('zamfara_user_role') as 'rider' | 'driver' | 'admin' | null;
+    const role = savedRole || 'rider';
+    
+    if (role === 'admin') {
+      const savedAdmins = localStorage.getItem('zamfara_admins');
+      if (savedAdmins) {
+        const parsed = JSON.parse(savedAdmins);
+        if (parsed && parsed.length > 0) {
+          return {
+            name: parsed[0].name,
+            rating: 5.0,
+            balance: 250000.0,
+            isDriver: false,
+            avatar: parsed[0].avatar,
+            role: 'admin'
+          };
+        }
       }
+      return {
+        name: 'Shehu Gusau',
+        rating: 5.0,
+        balance: 250000.0,
+        isDriver: false,
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
+        role: 'admin'
+      };
+    } else if (role === 'driver') {
+      const savedDrivers = localStorage.getItem('zamfara_drivers');
+      if (savedDrivers) {
+        const parsed = JSON.parse(savedDrivers);
+        if (parsed && parsed.length > 0) {
+          return {
+            name: parsed[0].name,
+            rating: parsed[0].rating,
+            balance: 0.0,
+            isDriver: true,
+            avatar: parsed[0].avatar,
+            role: 'driver'
+          };
+        }
+      }
+      return {
+        name: 'Michael Scott',
+        rating: 4.85,
+        balance: 0.0,
+        isDriver: true,
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+        role: 'driver'
+      };
+    } else {
+      const savedPassengers = localStorage.getItem('zamfara_passengers');
+      if (savedPassengers) {
+        const parsed = JSON.parse(savedPassengers);
+        if (parsed && parsed.length > 0) {
+          return {
+            name: parsed[0].name,
+            rating: parsed[0].rating,
+            balance: parsed[0].balance,
+            isDriver: false,
+            avatar: parsed[0].avatar,
+            role: 'rider'
+          };
+        }
+      }
+      return {
+        name: 'Ashiru Shehu',
+        rating: 4.92,
+        balance: 50000.00,
+        isDriver: false,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        role: 'rider'
+      };
     }
-    return {
-      name: 'Ashiru Shehu',
-      rating: 4.92,
-      balance: 50000.00,
-      isDriver: false,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-    };
   });
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'rider' | 'driver' | 'settings' | 'users'>('dashboard');
+
+  // Enforce access control and synchronize role to localStorage
+  useEffect(() => {
+    if (profile.role) {
+      localStorage.setItem('zamfara_user_role', profile.role);
+    }
+  }, [profile.role]);
+
+  useEffect(() => {
+    if (profile.role === 'rider' && activeTab !== 'rider' && activeTab !== 'settings') {
+      setActiveTab('rider');
+    } else if (profile.role === 'driver' && activeTab !== 'driver' && activeTab !== 'settings') {
+      setActiveTab('driver');
+    } else if (profile.role === 'admin' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'settings') {
+      setActiveTab('dashboard');
+    }
+  }, [profile.role, activeTab]);
   const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
     const saved = localStorage.getItem('zamfara_view_mode');
     return (saved as 'landing' | 'app') || 'landing';
@@ -664,64 +734,74 @@ export default function App() {
 
         {/* Core Tab Switch Control */}
         <div className="flex bg-zinc-900 rounded-xl p-1 border border-zinc-800">
-          <button
-            onClick={() => {
-              setActiveTab('dashboard');
-            }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'dashboard'
-                ? 'bg-white text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-            id="tab-select-dashboard"
-          >
-            <LayoutDashboard size={13} />
-            Dashboard
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('rider');
-              setProfile((p) => ({ ...p, isDriver: false }));
-            }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'rider'
-                ? 'bg-white text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-            id="tab-select-rider"
-          >
-            <User size={13} />
-            Rider Mode
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('driver');
-              setProfile((p) => ({ ...p, isDriver: true }));
-            }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'driver'
-                ? 'bg-white text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-            id="tab-select-driver"
-          >
-            <Car size={13} />
-            Driver Mode
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('users');
-            }}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'users'
-                ? 'bg-white text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-            id="tab-select-users"
-          >
-            <ShieldCheck size={13} />
-            User Hub
-          </button>
+          {profile.role === 'admin' && (
+            <>
+              <button
+                onClick={() => {
+                  setActiveTab('dashboard');
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard'
+                    ? 'bg-white text-zinc-950 shadow-md'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                id="tab-select-dashboard"
+              >
+                <LayoutDashboard size={13} />
+                Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('users');
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'bg-white text-zinc-950 shadow-md'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                id="tab-select-users"
+              >
+                <ShieldCheck size={13} />
+                User Hub
+              </button>
+            </>
+          )}
+
+          {profile.role === 'rider' && (
+            <button
+              onClick={() => {
+                setActiveTab('rider');
+                setProfile((p) => ({ ...p, isDriver: false }));
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'rider'
+                  ? 'bg-white text-zinc-950 shadow-md'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+              id="tab-select-rider"
+            >
+              <User size={13} />
+              Rider Mode
+            </button>
+          )}
+
+          {profile.role === 'driver' && (
+            <button
+              onClick={() => {
+                setActiveTab('driver');
+                setProfile((p) => ({ ...p, isDriver: true }));
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'driver'
+                  ? 'bg-white text-zinc-950 shadow-md'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+              id="tab-select-driver"
+            >
+              <Car size={13} />
+              Driver Mode
+            </button>
+          )}
         </div>
 
         {/* Secondary Navigation & Balance HUD */}
@@ -766,45 +846,69 @@ export default function App() {
         {/* LEFT COLUMN: INTERACTIVE INPUT PANEL (4 cols) */}
         <div className="lg:col-span-5 xl:col-span-4 h-full flex flex-col justify-start">
           {activeTab === 'dashboard' && (
-            <DashboardPanel
-              completedTrips={completedTrips}
-              onTriggerRandomTrip={handleTriggerRandomTrip}
-              isSurgeActive={isSurgeActive}
-              setIsSurgeActive={setIsSurgeActive}
-              currentCity={currentCity}
-            />
+            profile.role === 'admin' ? (
+              <DashboardPanel
+                completedTrips={completedTrips}
+                onTriggerRandomTrip={handleTriggerRandomTrip}
+                isSurgeActive={isSurgeActive}
+                setIsSurgeActive={setIsSurgeActive}
+                currentCity={currentCity}
+              />
+            ) : (
+              <div className="bg-zinc-900 border border-red-900/50 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+                <ShieldAlert className="mx-auto text-red-500 animate-bounce" size={48} />
+                <h3 className="text-white font-extrabold text-lg">Access Denied</h3>
+                <p className="text-zinc-400 text-xs">You do not have administrative privileges to access the Operations Dashboard.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'rider' && (
-            <RiderPanel
-              city={currentCity}
-              cities={CITIES}
-              onCityChange={handleCityChange}
-              origin={origin}
-              destination={destination}
-              setOrigin={setOrigin}
-              setDestination={setDestination}
-              trip={trip}
-              onBookTrip={handleBookTrip}
-              onCancelTrip={handleCancelTrip}
-              onCompleteTripRating={handleCompleteTripRating}
-              chatMessages={chatMessages}
-              onSendMessage={handleSendMessage}
-              isSurgeActive={isSurgeActive}
-              travelMode={travelMode}
-              setTravelMode={setTravelMode}
-            />
+            profile.role === 'rider' ? (
+              <RiderPanel
+                city={currentCity}
+                cities={CITIES}
+                onCityChange={handleCityChange}
+                origin={origin}
+                destination={destination}
+                setOrigin={setOrigin}
+                setDestination={setDestination}
+                trip={trip}
+                onBookTrip={handleBookTrip}
+                onCancelTrip={handleCancelTrip}
+                onCompleteTripRating={handleCompleteTripRating}
+                chatMessages={chatMessages}
+                onSendMessage={handleSendMessage}
+                isSurgeActive={isSurgeActive}
+                travelMode={travelMode}
+                setTravelMode={setTravelMode}
+              />
+            ) : (
+              <div className="bg-zinc-900 border border-red-900/50 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+                <ShieldAlert className="mx-auto text-red-500" size={48} />
+                <h3 className="text-white font-extrabold text-lg">Rider Session Required</h3>
+                <p className="text-zinc-400 text-xs">Please login with a Rider account to use the Rider booking system.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'driver' && (
-            <DriverPanel
-              city={currentCity}
-              profile={profile}
-              setProfile={setProfile}
-              driverPosition={driverPosition}
-              setDriverPosition={setDriverPosition}
-              onAcceptTripByDriver={() => {}} // simulated locally inside panel
-            />
+            profile.role === 'driver' ? (
+              <DriverPanel
+                city={currentCity}
+                profile={profile}
+                setProfile={setProfile}
+                driverPosition={driverPosition}
+                setDriverPosition={setDriverPosition}
+                onAcceptTripByDriver={() => {}} // simulated locally inside panel
+              />
+            ) : (
+              <div className="bg-zinc-900 border border-red-900/50 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+                <ShieldAlert className="mx-auto text-red-500" size={48} />
+                <h3 className="text-white font-extrabold text-lg">Driver Session Required</h3>
+                <p className="text-zinc-400 text-xs">Please login with a Driver account to access the Driver console.</p>
+              </div>
+            )
           )}
 
           {activeTab === 'settings' && (
@@ -821,23 +925,31 @@ export default function App() {
           )}
 
           {activeTab === 'users' && (
-            <UserManagementPanel
-              activeProfile={profile}
-              setActiveProfile={setProfile}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              passengers={passengers}
-              setPassengers={setPassengers}
-              drivers={drivers}
-              setDrivers={setDrivers}
-              admins={admins}
-              setAdmins={setAdmins}
-              auditLogs={auditLogs}
-              addAuditLog={addAuditLog}
-              isSurgeActive={isSurgeActive}
-              setIsSurgeActive={setIsSurgeActive}
-              completedTrips={completedTrips}
-            />
+            profile.role === 'admin' ? (
+              <UserManagementPanel
+                activeProfile={profile}
+                setActiveProfile={setProfile}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                passengers={passengers}
+                setPassengers={setPassengers}
+                drivers={drivers}
+                setDrivers={setDrivers}
+                admins={admins}
+                setAdmins={setAdmins}
+                auditLogs={auditLogs}
+                addAuditLog={addAuditLog}
+                isSurgeActive={isSurgeActive}
+                setIsSurgeActive={setIsSurgeActive}
+                completedTrips={completedTrips}
+              />
+            ) : (
+              <div className="bg-zinc-900 border border-red-900/50 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+                <ShieldAlert className="mx-auto text-red-500 animate-bounce" size={48} />
+                <h3 className="text-white font-extrabold text-lg">Access Denied</h3>
+                <p className="text-zinc-400 text-xs">You do not have administrative privileges to access the User Hub or inspect other users' details.</p>
+              </div>
+            )
           )}
         </div>
 

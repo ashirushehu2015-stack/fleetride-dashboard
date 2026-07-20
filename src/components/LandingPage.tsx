@@ -134,7 +134,8 @@ export default function LandingPage({
           rating: passenger.rating || 5.0,
           balance: passenger.balance || 50000.0,
           isDriver: false,
-          avatar: passenger.avatar
+          avatar: passenger.avatar,
+          role: 'rider'
         };
         addAuditLog('RIDER', `${passenger.name} successfully authenticated as Active Rider via Secure Login.`);
         onLoginSuccess('rider', uProfile, 'rider');
@@ -150,7 +151,8 @@ export default function LandingPage({
           rating: driver.rating || 4.8,
           balance: 0.0, // Earnings are accumulated dynamically
           isDriver: true,
-          avatar: driver.avatar
+          avatar: driver.avatar,
+          role: 'driver'
         };
         addAuditLog('DRIVER', `Driver ${driver.name} connected live container console. GPS verification complete.`);
         onLoginSuccess('driver', uProfile, 'driver');
@@ -166,7 +168,8 @@ export default function LandingPage({
           rating: 5.0,
           balance: 250000.0, // Admin buffer balance
           isDriver: false,
-          avatar: admin.avatar
+          avatar: admin.avatar,
+          role: 'admin'
         };
         addAuditLog('ADMIN', `Administrator ${admin.name} entered Super Admin workspace. Access token dispatched.`);
         onLoginSuccess('admin', uProfile, 'users');
@@ -201,7 +204,8 @@ export default function LandingPage({
         rating: 5.0,
         balance: newRider.balance,
         isDriver: false,
-        avatar: newRider.avatar
+        avatar: newRider.avatar,
+        role: 'rider'
       };
 
       addAuditLog('RIDER', `New Rider Account Registered: ${newRider.name}. Account credited with ₦${newRider.balance}.`);
@@ -231,7 +235,8 @@ export default function LandingPage({
         rating: 5.0,
         balance: 0.0,
         isDriver: true,
-        avatar: newDriver.avatar
+        avatar: newDriver.avatar,
+        role: 'driver'
       };
 
       addAuditLog('DRIVER', `New Driver Registered and Verified: ${newDriver.name} driving ${newDriver.vehicleName} [${newDriver.plateNumber}]`);
@@ -255,7 +260,8 @@ export default function LandingPage({
         rating: 5.0,
         balance: 100000.0,
         isDriver: false,
-        avatar: newAdmin.avatar
+        avatar: newAdmin.avatar,
+        role: 'admin'
       };
 
       addAuditLog('ADMIN', `New Administrator Access Generated for ${newAdmin.name} (${newAdmin.role})`);
@@ -366,10 +372,23 @@ export default function LandingPage({
             </a>
             <a 
               href="#pricing" 
-              onClick={() => setActiveNav('pricing')}
+              onClick={() => {
+                setActiveNav('pricing');
+                setTravelMode('municipal');
+              }}
               className={`transition hover:text-white ${activeNav === 'pricing' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
             >
-              Fares & Fleet
+              Intrastate
+            </a>
+            <a 
+              href="#pricing" 
+              onClick={() => {
+                setActiveNav('interstate');
+                setTravelMode('interstate');
+              }}
+              className={`transition hover:text-white ${activeNav === 'interstate' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+            >
+              Interstate
             </a>
             <a 
               href="#cities" 
@@ -574,27 +593,24 @@ export default function LandingPage({
           <div className="lg:col-span-7">
             <div className="bg-zinc-950 border border-zinc-850 p-6 md:p-8 rounded-3xl space-y-6">
               
-              {/* Travel Mode Toggle */}
-              <div className="flex border border-zinc-850 p-1.5 rounded-2xl bg-zinc-900/40">
+              {/* Active Travel Mode Indicator & Separation Switcher */}
+              <div className="flex items-center justify-between border border-zinc-850/80 p-3 rounded-2xl bg-zinc-900/30">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    {travelMode === 'municipal' ? 'Intrastate (Intra-City)' : 'Interstate (Inter-City)'}
+                  </span>
+                </div>
                 <button
-                  onClick={() => setTravelMode('municipal')}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition ${
-                    travelMode === 'municipal'
-                      ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
+                  onClick={() => {
+                    const nextMode = travelMode === 'municipal' ? 'interstate' : 'municipal';
+                    setTravelMode(nextMode);
+                    setActiveNav(nextMode === 'municipal' ? 'pricing' : 'interstate');
+                  }}
+                  className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800 cursor-pointer"
                 >
-                  Municipal (Intra-City)
-                </button>
-                <button
-                  onClick={() => setTravelMode('interstate')}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition ${
-                    travelMode === 'interstate'
-                      ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Out of State (Inter-City)
+                  {travelMode === 'municipal' ? 'Switch to Interstate' : 'Switch to Intrastate'}
+                  <ArrowRight size={11} />
                 </button>
               </div>
 
@@ -603,7 +619,7 @@ export default function LandingPage({
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                       <h4 className="text-white font-extrabold text-lg">Calculate Route Cost</h4>
-                      <p className="text-zinc-500 text-xs">Simulated pricing for municipal travel segments</p>
+                      <p className="text-zinc-500 text-xs">Simulated pricing for intrastate travel segments</p>
                     </div>
                     
                     {/* City Select */}
@@ -731,7 +747,7 @@ export default function LandingPage({
                   </div>
                   <div className="text-[10px] text-zinc-500">
                     {travelMode === 'municipal' 
-                      ? "Includes local base fuel tax, safety surcharges, and municipal licensing."
+                      ? "Includes local base fuel tax, safety surcharges, and intrastate licensing."
                       : "Includes state border toll clearance, highway safety patrol levies, and fuel index surcharges."
                     }
                   </div>
@@ -764,19 +780,19 @@ export default function LandingPage({
       {/* ACTIVE CITIES CONTAINER SHIFT CARD */}
       <section id="cities" className="max-w-7xl mx-auto py-16 px-6 space-y-10">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">MUNICIPAL NETWORKS</span>
+          <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">INTRASTATE NETWORKS</span>
           <h3 className="text-3xl font-extrabold text-white tracking-tight">
             Supported Operational Sectors
           </h3>
           <p className="text-zinc-400 text-xs">
-            Our navigation engine integrates major economic and administrative metropolitan zones across Nigeria. Switch municipalities instantly inside the ride console.
+            Our navigation engine integrates major economic and administrative metropolitan zones across Nigeria. Switch intrastate networks instantly inside the ride console.
           </p>
         </div>
 
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="relative">
             <label className="block text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-2 text-center">
-              Select Operating Municipality:
+              Select Operating Network:
             </label>
             <div className="relative max-w-md mx-auto">
               <select
@@ -912,7 +928,7 @@ export default function LandingPage({
               </div>
               <h4 className="text-white font-extrabold text-base">System Administrator</h4>
               <p className="text-zinc-400 text-xs leading-relaxed">
-                Oversee entire operations. Verify or suspend drivers instantly, allocate commuter balance buffers, inspect secure background system logs, and control municipal surge configurations.
+                Oversee entire operations. Verify or suspend drivers instantly, allocate commuter balance buffers, inspect secure background system logs, and control intrastate surge configurations.
               </p>
               <ul className="space-y-2 text-zinc-500 text-xs pt-2">
                 <li className="flex items-center gap-2"><CheckCircle2 size={13} className="text-emerald-400" /> Background Audit Trail logs</li>

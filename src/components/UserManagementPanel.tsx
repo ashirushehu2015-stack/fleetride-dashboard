@@ -144,7 +144,8 @@ export default function UserManagementPanel({
         rating: target.rating,
         balance: target.balance,
         isDriver: false,
-        avatar: target.avatar
+        avatar: target.avatar,
+        role: 'rider'
       });
       addAuditLog('SYSTEM', `Switched active simulation profile to Passenger: ${target.name}`);
       setActiveTab('rider');
@@ -154,7 +155,8 @@ export default function UserManagementPanel({
         rating: target.rating,
         balance: 150000.00, // drivers have high mock wallet representing historical earnings
         isDriver: true,
-        avatar: target.avatar
+        avatar: target.avatar,
+        role: 'driver'
       });
       addAuditLog('SYSTEM', `Switched active simulation profile to Driver: ${target.name}`);
       setActiveTab('driver');
@@ -165,7 +167,8 @@ export default function UserManagementPanel({
         rating: 5.0,
         balance: 999999.00, // unlimited or high administrative budget
         isDriver: false,
-        avatar: target.avatar
+        avatar: target.avatar,
+        role: 'admin'
       });
       addAuditLog('SYSTEM', `Switched active simulation profile to Admin: ${target.name}`);
       setSubTab('control'); // Go to console

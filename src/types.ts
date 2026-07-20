@@ -68,4 +68,5 @@ export interface UserProfile {
   balance: number;
   isDriver: boolean;
   avatar: string;
+  role: 'rider' | 'driver' | 'admin';
 }
