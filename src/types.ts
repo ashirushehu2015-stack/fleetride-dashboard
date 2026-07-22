@@ -53,6 +53,9 @@ export interface Trip {
   rating?: number;
   review?: string;
   timestamp: string;
+  passengerName?: string;
+  passengerAvatar?: string;
+  passengerRating?: number;
 }
 
 export interface ChatMessage {

@@ -228,17 +228,17 @@ export default function DashboardPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-100 max-h-[85vh] lg:max-h-[90vh]">
+    <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-[#E5DFD3] max-h-[85vh] lg:max-h-[90vh]">
       
       {/* HEADER BANNER */}
-      <div className="p-4 bg-zinc-950 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
+      <div className="p-4 bg-[#FAF7F2] text-zinc-900 flex items-center justify-between border-b border-[#E5DFD3] shrink-0">
         <div className="flex items-center gap-2">
-          <div className="bg-emerald-500 text-zinc-950 p-1.5 rounded-lg">
+          <div className="bg-emerald-700 text-white p-1.5 rounded-lg shadow-xs">
             <Activity size={16} />
           </div>
           <div>
-            <span className="font-bold text-sm block">System Dashboard</span>
-            <span className="text-[10px] text-zinc-400">Live Ride-Sharing Metrics</span>
+            <span className="font-extrabold text-sm block text-zinc-900">System Dashboard</span>
+            <span className="text-[10px] text-zinc-600 font-semibold">Live Ride-Sharing Metrics</span>
           </div>
         </div>
 
@@ -247,8 +247,8 @@ export default function DashboardPanel({
           onClick={() => setIsSurgeActive(!isSurgeActive)}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
             isSurgeActive
-              ? 'bg-amber-500 text-zinc-950 shadow-md animate-pulse'
-              : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
+              ? 'bg-amber-400 text-zinc-950 shadow-xs animate-pulse'
+              : 'bg-white text-zinc-800 border border-[#E5DFD3] hover:bg-[#FAF7F2]'
           }`}
           id="toggle-dashboard-surge-btn"
         >
@@ -257,7 +257,7 @@ export default function DashboardPanel({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
         
         {/* SECTION 1: KEY PERFORMANCE RATINGS (KPI Grid) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -266,18 +266,18 @@ export default function DashboardPanel({
             onClick={() => setActiveMetric('revenue')}
             className={`p-3 rounded-xl border text-left transition cursor-pointer ${
               activeMetric === 'revenue'
-                ? 'bg-zinc-950 border-zinc-950 text-white shadow-md'
-                : 'bg-zinc-50 border-zinc-100 hover:bg-zinc-100/50'
+                ? 'bg-zinc-900 border-zinc-900 text-white shadow-md'
+                : 'bg-[#FAF7F2] border-[#E5DFD3] hover:bg-[#F2EDE4]'
             }`}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'revenue' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'revenue' ? 'text-zinc-300' : 'text-zinc-600'}`}>
                 Gross Revenue
               </span>
-              <DollarSign size={14} className={activeMetric === 'revenue' ? 'text-emerald-400' : 'text-zinc-400'} />
+              <DollarSign size={14} className={activeMetric === 'revenue' ? 'text-emerald-400' : 'text-zinc-600'} />
             </div>
             <div className="text-lg font-black">₦{stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <div className="text-[9px] mt-1 text-emerald-500 flex items-center gap-0.5 font-medium">
+            <div className={`text-[9px] mt-1 flex items-center gap-0.5 font-bold ${activeMetric === 'revenue' ? 'text-emerald-400' : 'text-emerald-700'}`}>
               <ArrowUpRight size={10} /> +12.4% vs last week
             </div>
           </button>
@@ -286,44 +286,44 @@ export default function DashboardPanel({
             onClick={() => setActiveMetric('rides')}
             className={`p-3 rounded-xl border text-left transition cursor-pointer ${
               activeMetric === 'rides'
-                ? 'bg-zinc-950 border-zinc-950 text-white shadow-md'
-                : 'bg-zinc-50 border-zinc-100 hover:bg-zinc-100/50'
+                ? 'bg-zinc-900 border-zinc-900 text-white shadow-md'
+                : 'bg-[#FAF7F2] border-[#E5DFD3] hover:bg-[#F2EDE4]'
             }`}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'rides' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${activeMetric === 'rides' ? 'text-zinc-300' : 'text-zinc-600'}`}>
                 Completed Trips
               </span>
-              <Car size={14} className={activeMetric === 'rides' ? 'text-blue-400' : 'text-zinc-400'} />
+              <Car size={14} className={activeMetric === 'rides' ? 'text-emerald-400' : 'text-zinc-600'} />
             </div>
             <div className="text-lg font-black">{stats.rides} rides</div>
-            <div className="text-[9px] mt-1 text-emerald-500 flex items-center gap-0.5 font-medium">
+            <div className={`text-[9px] mt-1 flex items-center gap-0.5 font-bold ${activeMetric === 'rides' ? 'text-emerald-400' : 'text-emerald-700'}`}>
               <ArrowUpRight size={10} /> +8.1% demand index
             </div>
           </button>
 
-          <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-left">
+          <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl text-left">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
                 Average Rating
               </span>
-              <Star size={14} className="text-yellow-500 fill-yellow-500" />
+              <Star size={14} className="text-amber-500 fill-amber-500" />
             </div>
-            <div className="text-lg font-black">{stats.avgRating.toFixed(2)} ★</div>
-            <div className="text-[9px] mt-1 text-emerald-600 font-medium">
+            <div className="text-lg font-black text-zinc-900">{stats.avgRating.toFixed(2)} ★</div>
+            <div className="text-[9px] mt-1 text-emerald-700 font-bold">
               Top 1% Driver rating
             </div>
           </div>
 
-          <div className="p-3 bg-zinc-50 border border-zinc-100 rounded-xl text-left">
+          <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl text-left">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
                 CO2 Saved (Est)
               </span>
-              <Leaf size={14} className="text-emerald-500" />
+              <Leaf size={14} className="text-emerald-700" />
             </div>
-            <div className="text-lg font-black text-emerald-600">{stats.carbonSavedKg} kg</div>
-            <div className="text-[9px] mt-1 text-zinc-500 font-medium">
+            <div className="text-lg font-black text-emerald-700">{stats.carbonSavedKg} kg</div>
+            <div className="text-[9px] mt-1 text-zinc-600 font-medium">
               Powered by Moto & EVs
             </div>
           </div>
@@ -331,20 +331,20 @@ export default function DashboardPanel({
         </div>
 
         {/* SECTION 2: INTERACTIVE SIMULATION GENERATOR */}
-        <div className="bg-emerald-500/5 border border-emerald-200/50 rounded-xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
           <div className="space-y-1 text-left">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <h4 className="font-bold text-xs text-zinc-800">Dynamic Live Simulator Controller</h4>
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              <h4 className="font-extrabold text-xs text-zinc-900">Dynamic Live Simulator Controller</h4>
             </div>
-            <p className="text-[11px] text-zinc-500 leading-relaxed max-w-xl">
+            <p className="text-[11px] text-zinc-600 font-medium leading-relaxed max-w-xl">
               Want to see the charts animate immediately? Click below to instantly generate a random completed trip in the city database.
             </p>
           </div>
 
           <button
             onClick={triggerRandomBookingSimulation}
-            className="bg-zinc-950 hover:bg-zinc-900 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm flex items-center gap-1.5 shrink-0 transition cursor-pointer"
+            className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-extrabold px-4 py-2.5 rounded-lg shadow-sm flex items-center gap-1.5 shrink-0 transition cursor-pointer"
             id="trigger-random-trip-sim-btn"
           >
             <Plus size={14} /> Add Simulated Ride
@@ -352,15 +352,15 @@ export default function DashboardPanel({
         </div>
 
         {/* SECTION 3: RECHARTS GRAPHICAL TREND */}
-        <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4">
+        <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="font-bold text-xs text-zinc-800">
+              <h4 className="font-extrabold text-xs text-zinc-900">
                 {activeMetric === 'revenue' ? 'Revenue Generation Index' : 'Daily Trip Volume Distribution'}
               </h4>
-              <p className="text-[10px] text-zinc-400">Weekly breakdown including real-time simulation updates</p>
+              <p className="text-[10px] text-zinc-600 font-medium">Weekly breakdown including real-time simulation updates</p>
             </div>
-            <span className="text-[10px] bg-white border border-zinc-200 px-2.5 py-1 rounded-full font-mono text-zinc-500 font-medium">
+            <span className="text-[10px] bg-white border border-[#E5DFD3] px-2.5 py-1 rounded-full font-mono text-zinc-800 font-bold">
               7-Day Cycle
             </span>
           </div>
@@ -370,24 +370,24 @@ export default function DashboardPanel({
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'} stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={activeMetric === 'revenue' ? '#047857' : '#0284c7'} stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor={activeMetric === 'revenue' ? '#047857' : '#0284c7'} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#71717a' }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5DFD3" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
-                  labelStyle={{ fontWeight: 'bold', fontSize: '11px', color: '#91919a' }}
+                  labelStyle={{ fontWeight: 'bold', fontSize: '11px', color: '#a1a1aa' }}
                   itemStyle={{ fontSize: '12px' }}
                 />
                 <Area
                   type="monotone"
                   dataKey={activeMetric}
                   name={activeMetric === 'revenue' ? 'Revenue (₦)' : 'Trips Completed'}
-                  stroke={activeMetric === 'revenue' ? '#10b981' : '#3b82f6'}
-                  strokeWidth={2}
+                  stroke={activeMetric === 'revenue' ? '#047857' : '#0284c7'}
+                  strokeWidth={2.5}
                   fillOpacity={1}
                   fill="url(#colorMetric)"
                 />
@@ -400,25 +400,25 @@ export default function DashboardPanel({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
           {/* Bar Chart: Vehicle Class breakdown */}
-          <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4 text-left">
+          <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4 text-left">
             <div>
-              <h4 className="font-bold text-xs text-zinc-800">Demand Share by Car Class</h4>
-              <p className="text-[10px] text-zinc-400 mb-3">Popularity breakdown of booking categories</p>
+              <h4 className="font-extrabold text-xs text-zinc-900">Demand Share by Car Class</h4>
+              <p className="text-[10px] text-zinc-600 font-medium mb-3">Popularity breakdown of booking categories</p>
             </div>
             
             <div className="h-[200px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={vehicleBreakdownData} layout="vertical" margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e4e4e7" />
-                  <XAxis type="number" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#71717a' }} axisLine={false} tickLine={false} width={65} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5DFD3" />
+                  <XAxis type="number" tick={{ fontSize: 9, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} width={65} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
                     itemStyle={{ fontSize: '11px' }}
                   />
                   <Bar dataKey="value" name="Rides Ordered" fill="#18181b" radius={[0, 4, 4, 0]}>
                     {vehicleBreakdownData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? '#18181b' : index === 1 ? '#3b82f6' : index === 2 ? '#a855f7' : index === 3 ? '#e11d48' : '#facc15'} />
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#18181b' : index === 1 ? '#0284c7' : index === 2 ? '#7c3aed' : index === 3 ? '#e11d48' : '#d97706'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -427,10 +427,10 @@ export default function DashboardPanel({
           </div>
 
           {/* Pie Chart: Trip Distance bracket */}
-          <div className="bg-zinc-50 border border-zinc-150 rounded-xl p-4 text-left">
+          <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4 text-left">
             <div>
-              <h4 className="font-bold text-xs text-zinc-800">Trip Distance Distribution</h4>
-              <p className="text-[10px] text-zinc-400 mb-3">Breakdown of ride length categories</p>
+              <h4 className="font-extrabold text-xs text-zinc-900">Trip Distance Distribution</h4>
+              <p className="text-[10px] text-zinc-600 font-medium mb-3">Breakdown of ride length categories</p>
             </div>
 
             <div className="h-[200px] w-full flex items-center justify-between">
@@ -464,9 +464,9 @@ export default function DashboardPanel({
                   <div key={item.name} className="flex flex-col">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-zinc-700 text-[10px]">{item.name}</span>
+                      <span className="font-bold text-zinc-800 text-[10px]">{item.name}</span>
                     </div>
-                    <span className="font-extrabold text-zinc-800 text-xs pl-4">{item.value} bookings</span>
+                    <span className="font-extrabold text-zinc-900 text-xs pl-4">{item.value} bookings</span>
                   </div>
                 ))}
               </div>
@@ -478,15 +478,15 @@ export default function DashboardPanel({
         {/* SECTION 5: RECENT TRIPS & LIVE ACTIVITY */}
         <div className="space-y-3 text-left">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Recent Trips & Live Activity</h4>
-            <span className="text-[10px] text-zinc-500 font-semibold">{completedTrips.length} Total Trips</span>
+            <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">Recent Trips & Live Activity</h4>
+            <span className="text-[10px] text-zinc-600 font-bold">{completedTrips.length} Total Trips</span>
           </div>
 
           {completedTrips.length === 0 ? (
-            <div className="py-8 text-center border-2 border-dashed border-zinc-150 rounded-xl bg-zinc-50">
-              <Calendar size={24} className="mx-auto text-zinc-300 mb-2" />
-              <h5 className="text-xs font-bold text-zinc-700">No recent trips yet</h5>
-              <p className="text-[10px] text-zinc-400 max-w-[200px] mx-auto mt-1">
+            <div className="py-8 text-center border-2 border-dashed border-[#E5DFD3] rounded-xl bg-[#FAF7F2]">
+              <Calendar size={24} className="mx-auto text-zinc-400 mb-2" />
+              <h5 className="text-xs font-extrabold text-zinc-900">No recent trips yet</h5>
+              <p className="text-[10px] text-zinc-600 font-medium max-w-[200px] mx-auto mt-1">
                 Completed user bookings or simulated entries will populate this activity log!
               </p>
             </div>
@@ -499,48 +499,48 @@ export default function DashboardPanel({
                     : trip.timestamp)
                   : new Date().toLocaleTimeString();
                 return (
-                  <div key={trip.id} className="bg-zinc-50 border border-zinc-150 rounded-xl p-3 flex flex-col sm:flex-row justify-between gap-3 text-xs shadow-sm hover:border-zinc-300 transition">
+                  <div key={trip.id} className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-3 flex flex-col sm:flex-row justify-between gap-3 text-xs shadow-xs hover:border-zinc-400 transition">
                     <div className="flex gap-3">
                       <img
                         src={trip.driver.avatar}
                         alt={trip.driver.name}
-                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-zinc-200"
+                        className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#E5DFD3]"
                         referrerPolicy="no-referrer"
                       />
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-zinc-800">{trip.driver.name}</span>
-                          <span className="text-[9px] bg-zinc-200 text-zinc-700 px-1.5 py-0.5 rounded font-mono font-bold uppercase shrink-0">
+                          <span className="font-extrabold text-zinc-900">{trip.driver.name}</span>
+                          <span className="text-[9px] bg-zinc-900 text-white px-1.5 py-0.5 rounded font-mono font-bold uppercase shrink-0">
                             {trip.vehicleType}
                           </span>
                           {trip.rating && (
-                            <span className="flex items-center text-amber-500 text-[10px] font-bold">
-                              <Star size={10} className="fill-amber-500 mr-0.5" />
+                            <span className="flex items-center text-amber-600 text-[10px] font-bold">
+                              <Star size={10} className="fill-amber-500 text-amber-500 mr-0.5" />
                               {trip.rating}
                             </span>
                           )}
                         </div>
                         
-                        <p className="text-[10px] text-zinc-400 font-medium truncate mt-0.5">
+                        <p className="text-[10px] text-zinc-600 font-bold truncate mt-0.5">
                           {trip.origin.label} → {trip.destination.label}
                         </p>
 
-                        <div className="flex items-center gap-1 text-[9px] text-zinc-400 font-mono mt-1">
-                          <Clock size={10} className="text-zinc-400" />
+                        <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-mono mt-1 font-semibold">
+                          <Clock size={10} className="text-zinc-500" />
                           <span>{formattedDate}</span>
                         </div>
 
                         {trip.review && (
-                          <p className="text-[10px] text-zinc-500 italic mt-1 leading-relaxed border-l-2 border-zinc-200 pl-1.5">
+                          <p className="text-[10px] text-zinc-700 font-medium italic mt-1 leading-relaxed border-l-2 border-[#E5DFD3] pl-1.5">
                             "{trip.review}"
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-zinc-200">
-                      <div className="font-black text-emerald-600 text-sm">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-[9px] text-zinc-400 font-mono mt-0.5">
+                    <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-[#E5DFD3]">
+                      <div className="font-extrabold text-emerald-700 text-sm">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-[9px] text-zinc-600 font-mono mt-0.5 font-bold">
                         {trip.distanceMiles}km • {trip.durationMinutes}m
                       </div>
                     </div>
@@ -554,7 +554,7 @@ export default function DashboardPanel({
       </div>
 
       {/* FOOTER */}
-      <div className="bg-zinc-50 p-2 text-center text-[9px] text-zinc-400 border-t border-zinc-150 font-mono">
+      <div className="bg-[#FAF7F2] p-2 text-center text-[9px] text-zinc-600 border-t border-[#E5DFD3] font-mono font-semibold">
         Active demand model parameters updated in real-time
       </div>
     </div>

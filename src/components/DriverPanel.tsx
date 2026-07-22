@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Location } from '../types';
+import { UserProfile, Location, Trip } from '../types';
 import { MOCK_PASSENGERS } from '../data';
 import {
   Car,
@@ -38,6 +38,10 @@ interface DriverPanelProps {
     distance: number;
     duration: number;
   }) => void;
+  existingTrip?: Trip | null;
+  setExistingTrip?: React.Dispatch<React.SetStateAction<Trip | null>>;
+  isDriverOnline?: boolean;
+  setIsDriverOnline?: (online: boolean) => void;
 }
 
 interface SimulatedOffer {
@@ -60,6 +64,10 @@ export default function DriverPanel({
   driverPosition,
   setDriverPosition,
   onAcceptTripByDriver,
+  existingTrip,
+  setExistingTrip,
+  isDriverOnline,
+  setIsDriverOnline,
 }: DriverPanelProps) {
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [activeOffer, setActiveOffer] = useState<SimulatedOffer | null>(null);
@@ -68,11 +76,95 @@ export default function DriverPanel({
   const [driveProgress, setDriveProgress] = useState<number>(0);
   const [recentEarnings, setRecentEarnings] = useState<number>(0);
 
-  // 1. Simulate Incoming Ride Offers (when online and idle)
+  // Synchronize isOnline state with parent App.tsx so it knows a driver is online
   useEffect(() => {
-    if (!isOnline || activeOffer || activeTrip || driverState !== 'IDLE') return;
+    if (setIsDriverOnline) {
+      setIsDriverOnline(isOnline);
+    }
+    return () => {
+      if (setIsDriverOnline) {
+        setIsDriverOnline(false);
+      }
+    };
+  }, [isOnline, setIsDriverOnline]);
 
-    // Ping an offer every 10 to 15 seconds
+  // Synchronize state with existingTrip from parent App.tsx if it exists
+  useEffect(() => {
+    if (!existingTrip) {
+      // If parent trip is cleared, reset driver to IDLE if we were in a synchronized trip
+      if (activeTrip && !activeTrip.id.startsWith('simulated-random')) {
+        setActiveTrip(null);
+        setDriverState('IDLE');
+        setDriveProgress(0);
+      }
+      return;
+    }
+
+    // Check if the trip belongs to this driver or if we accepted it
+    if (existingTrip.driver && existingTrip.driver.name === profile.name) {
+      const mappedTrip: SimulatedOffer = {
+        id: existingTrip.id,
+        passengerName: existingTrip.passengerName || 'Ashiru Shehu',
+        passengerAvatar: existingTrip.passengerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        passengerRating: existingTrip.passengerRating || 4.9,
+        origin: existingTrip.origin,
+        destination: existingTrip.destination,
+        price: existingTrip.price,
+        distance: existingTrip.distanceMiles,
+        duration: existingTrip.durationMinutes,
+        countdown: 0,
+      };
+
+      setActiveTrip(mappedTrip);
+      setDriveProgress(existingTrip.progress || 0);
+      setDriverPosition(existingTrip.currentPosition || null);
+
+      if (existingTrip.status === 'ACCEPTED' || existingTrip.status === 'PICKING_UP') {
+        setDriverState('PICKING_UP');
+      } else if (existingTrip.status === 'ARRIVED') {
+        setDriverState('WAITING_PASSENGER');
+      } else if (existingTrip.status === 'TRIP_IN_PROGRESS') {
+        setDriverState('DRIVING');
+      } else if (existingTrip.status === 'COMPLETED') {
+        setDriverState('SUCCESS');
+      }
+    }
+  }, [existingTrip, profile.name]);
+
+  // 1. Detect Existing Trip or Simulate Incoming Ride Offers (when online and idle)
+  useEffect(() => {
+    if (!isOnline || driverState !== 'IDLE' || activeTrip) return;
+
+    // A. Detect existing trip with SEARCHING status
+    if (existingTrip && existingTrip.status === 'SEARCHING') {
+      if (activeOffer?.id === existingTrip.id) return;
+
+      const newOffer: SimulatedOffer = {
+        id: existingTrip.id,
+        passengerName: existingTrip.passengerName || 'Ashiru Shehu',
+        passengerAvatar: existingTrip.passengerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        passengerRating: existingTrip.passengerRating || 4.9,
+        origin: existingTrip.origin,
+        destination: existingTrip.destination,
+        price: existingTrip.price,
+        distance: existingTrip.distanceMiles,
+        duration: existingTrip.durationMinutes,
+        countdown: 30, // giving driver 30 seconds to accept
+      };
+      setActiveOffer(newOffer);
+      return;
+    }
+
+    // B. Clear existing-trip offer if status is no longer SEARCHING (e.g. cancelled)
+    if (activeOffer && existingTrip && activeOffer.id === existingTrip.id && existingTrip.status !== 'SEARCHING') {
+      setActiveOffer(null);
+      return;
+    }
+
+    // If activeOffer is already present (whether existing trip or simulated), do not start simulation interval
+    if (activeOffer) return;
+
+    // C. Fallback: Ping simulated offer every 15 seconds if no real trip request is active
     const interval = setInterval(() => {
       // Pick random passenger
       const passenger = MOCK_PASSENGERS[Math.floor(Math.random() * MOCK_PASSENGERS.length)];
@@ -95,12 +187,12 @@ export default function DriverPanel({
       // Calculate simple stats
       const distance = parseFloat((Math.hypot(dest.lat - orig.lat, dest.lng - orig.lng) * 60).toFixed(1));
       const duration = Math.round(distance * 1.6 + 2);
-      // Driver gets 80% of fare (20% Uber cut)
+      // Driver gets 80% of fare
       const customerPrice = (4.5 + distance * 1.8) * 300;
       const driverFare = parseFloat((customerPrice * 0.8).toFixed(2));
 
       const newOffer: SimulatedOffer = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: 'simulated-random-' + Math.random().toString(36).substr(2, 5),
         passengerName: passenger.name,
         passengerAvatar: passenger.avatar,
         passengerRating: passenger.rating,
@@ -113,10 +205,10 @@ export default function DriverPanel({
       };
 
       setActiveOffer(newOffer);
-    }, 8000);
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [isOnline, activeOffer, activeTrip, driverState, city]);
+  }, [isOnline, activeOffer, activeTrip, driverState, city, existingTrip]);
 
   // 2. Countdown Timer for active offer
   useEffect(() => {
@@ -138,6 +230,9 @@ export default function DriverPanel({
 
   // 3. Simulated Vehicle Drive (Tick Progress)
   useEffect(() => {
+    // Only run local simulated drive if this is NOT a synchronized existingTrip
+    if (existingTrip && activeTrip && existingTrip.id === activeTrip.id) return;
+
     if (driverState !== 'PICKING_UP' && driverState !== 'DRIVING') return;
 
     const driveInterval = setInterval(() => {
@@ -171,7 +266,7 @@ export default function DriverPanel({
     }, 1000);
 
     return () => clearInterval(driveInterval);
-  }, [driverState, activeTrip]);
+  }, [driverState, activeTrip, existingTrip]);
 
   // Go Online/Offline
   const handleToggleOnline = () => {
@@ -190,6 +285,19 @@ export default function DriverPanel({
 
   const handleAcceptOffer = () => {
     if (!activeOffer) return;
+    
+    onAcceptTripByDriver({
+      id: activeOffer.id,
+      passengerName: activeOffer.passengerName,
+      passengerAvatar: activeOffer.passengerAvatar,
+      passengerRating: activeOffer.passengerRating,
+      origin: activeOffer.origin,
+      destination: activeOffer.destination,
+      price: activeOffer.price,
+      distance: activeOffer.distance,
+      duration: activeOffer.duration,
+    });
+
     const trip = activeOffer;
     setActiveOffer(null);
     setActiveTrip(trip);
@@ -219,6 +327,14 @@ export default function DriverPanel({
       balance: parseFloat((prev.balance + activeTrip.price).toFixed(2)),
     }));
     setRecentEarnings(activeTrip.price);
+
+    // Clear parent trip if synchronized
+    if (existingTrip && existingTrip.id === activeTrip.id) {
+      if (setExistingTrip) {
+        setExistingTrip(null);
+      }
+    }
+
     setActiveTrip(null);
     setDriverState('SUCCESS');
   };
@@ -227,36 +343,39 @@ export default function DriverPanel({
     setDriverState('IDLE');
     setRecentEarnings(0);
     setDriverPosition(city.landmarks[0] || null);
+    if (existingTrip && setExistingTrip) {
+      setExistingTrip(null);
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-100 max-h-[85vh] lg:max-h-[90vh]">
+    <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-[#E5DFD3] max-h-[85vh] lg:max-h-[90vh]">
       {/* HEADER */}
-      <div className="p-4 bg-zinc-950 text-white flex items-center justify-between border-b border-zinc-800">
+      <div className="p-4 bg-[#FAF7F2] text-zinc-900 flex items-center justify-between border-b border-[#E5DFD3]">
         <div className="flex items-center gap-2">
-          <div className="bg-white text-black p-1.5 rounded-lg font-black tracking-tighter text-sm">
-            Uber
+          <div className="bg-emerald-700 text-white px-2 py-1 rounded-lg font-black tracking-tight text-xs uppercase shadow-xs">
+            ZamTaxi
           </div>
-          <span className="font-semibold text-zinc-200">Driver Console</span>
+          <span className="font-bold text-zinc-900">Driver Console</span>
         </div>
 
         {/* Online Badge status */}
-        <div className="flex items-center gap-1.5">
-          <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-          <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-[#E5DFD3] shadow-xs">
+          <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-600 animate-pulse' : 'bg-rose-500'}`} />
+          <span className="text-xs font-bold text-zinc-800 uppercase tracking-wider">
             {isOnline ? 'Online' : 'Offline'}
           </span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
         {/* ONLINE/OFFLINE RADAR ACTUATOR */}
         {driverState === 'IDLE' && (
           <div className="flex flex-col items-center justify-center py-4">
             <button
               onClick={handleToggleOnline}
-              className={`w-full py-4 rounded-xl font-bold text-sm tracking-wide text-white transition flex items-center justify-center gap-2 shadow-md cursor-pointer ${
-                isOnline ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              className={`w-full py-4 rounded-xl font-extrabold text-sm tracking-wide text-white transition flex items-center justify-center gap-2 shadow-md cursor-pointer ${
+                isOnline ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-700 hover:bg-emerald-800'
               }`}
               id="driver-online-offline-toggle"
             >
@@ -275,22 +394,22 @@ export default function DriverPanel({
 
         {/* earnings overview */}
         {driverState === 'IDLE' && (
-          <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-150 space-y-3">
+          <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Earnings Overview</span>
-              <TrendingUp size={16} className="text-emerald-600" />
+              <span className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">Earnings Overview</span>
+              <TrendingUp size={16} className="text-emerald-700" />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-white p-3 rounded-xl border border-zinc-100">
-                <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Total Balance</div>
-                <div className="text-xl font-black text-zinc-900">${profile.balance.toFixed(2)}</div>
+              <div className="bg-white p-3 rounded-xl border border-[#E5DFD3] shadow-xs">
+                <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Total Balance</div>
+                <div className="text-xl font-extrabold text-zinc-900">₦{profile.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </div>
-              <div className="bg-white p-3 rounded-xl border border-zinc-100">
-                <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Your Rating</div>
-                <div className="text-xl font-black text-zinc-900 flex items-center gap-1">
+              <div className="bg-white p-3 rounded-xl border border-[#E5DFD3] shadow-xs">
+                <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">Your Rating</div>
+                <div className="text-xl font-extrabold text-zinc-900 flex items-center gap-1">
                   {profile.rating.toFixed(2)}
-                  <Star size={16} className="text-yellow-400 fill-yellow-400 inline" />
+                  <Star size={16} className="text-amber-500 fill-amber-500 inline" />
                 </div>
               </div>
             </div>
@@ -301,16 +420,16 @@ export default function DriverPanel({
             STATE A: WAITING FOR OFFERS RADAR
            ========================================== */}
         {isOnline && driverState === 'IDLE' && !activeOffer && (
-          <div className="py-12 border-2 border-dashed border-zinc-150 rounded-xl flex flex-col items-center justify-center text-center space-y-4">
+          <div className="py-12 border-2 border-dashed border-[#E5DFD3] bg-[#FAF7F2]/60 rounded-xl flex flex-col items-center justify-center text-center space-y-4">
             <div className="relative">
-              <div className="absolute w-16 h-16 rounded-full border-2 border-zinc-950 animate-ping opacity-25" />
-              <div className="bg-zinc-900 text-white p-4 rounded-full shadow-lg">
+              <div className="absolute w-16 h-16 rounded-full border-2 border-emerald-600 animate-ping opacity-25" />
+              <div className="bg-emerald-700 text-white p-4 rounded-full shadow-md">
                 <Navigation size={28} className="animate-pulse transform rotate-45" />
               </div>
             </div>
             <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-zinc-800">Radar Scanning...</h4>
-              <p className="text-xs text-zinc-400 max-w-[200px] mx-auto">
+              <h4 className="text-sm font-extrabold text-zinc-900">Radar Scanning...</h4>
+              <p className="text-xs text-zinc-600 font-medium max-w-[200px] mx-auto">
                 Waiting for nearby passenger ride pings. Ensure you remain online.
               </p>
             </div>
@@ -321,66 +440,66 @@ export default function DriverPanel({
             STATE B: NEW OFFER DETECTED (PING)
            ========================================== */}
         {activeOffer && (
-          <div className="bg-amber-500/10 border-2 border-amber-300 rounded-2xl p-4 space-y-4 animate-pulse relative overflow-hidden shadow-lg">
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-4 animate-pulse relative overflow-hidden shadow-md">
             {/* Header banner */}
             <div className="flex justify-between items-center">
-              <span className="bg-amber-400 text-zinc-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+              <span className="bg-amber-400 text-zinc-950 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                 <Sparkles size={10} className="fill-zinc-950" />
                 New Ride Offer
               </span>
               {/* Circular countdown counter */}
-              <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-xs font-extrabold text-amber-700 bg-white shadow-sm">
+              <div className="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center text-xs font-extrabold text-amber-900 bg-white shadow-xs">
                 {activeOffer.countdown}
               </div>
             </div>
 
             {/* Passenger Credentials */}
-            <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-zinc-100">
+            <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-[#E5DFD3] shadow-xs">
               <img
                 src={activeOffer.passengerAvatar}
                 alt={activeOffer.passengerName}
-                className="w-11 h-11 rounded-full object-cover shrink-0 referrer-policy-no-referrer"
+                className="w-11 h-11 rounded-full object-cover shrink-0"
                 referrerPolicy="no-referrer"
               />
               <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-sm text-zinc-800 truncate">{activeOffer.passengerName}</h4>
-                <div className="flex items-center gap-1 text-xs text-zinc-500">
-                  <Star size={12} className="text-yellow-500 fill-yellow-500 shrink-0" />
+                <h4 className="font-extrabold text-sm text-zinc-900 truncate">{activeOffer.passengerName}</h4>
+                <div className="flex items-center gap-1 text-xs text-zinc-600 font-semibold">
+                  <Star size={12} className="text-amber-500 fill-amber-500 shrink-0" />
                   <span>{activeOffer.passengerRating.toFixed(1)} rating</span>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Estimated Payout</div>
-                <div className="text-lg font-black text-emerald-600">₦{activeOffer.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">Estimated Payout</div>
+                <div className="text-lg font-extrabold text-emerald-700">₦{activeOffer.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </div>
             </div>
 
             {/* Route details */}
             <div className="space-y-2 text-xs">
               <div className="flex items-start gap-2">
-                <MapPin size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-zinc-500 block text-[10px] uppercase tracking-wider">PICK UP</span>
-                  <p className="font-bold text-zinc-800">{activeOffer.origin.label}</p>
+                  <span className="font-bold text-zinc-600 block text-[10px] uppercase tracking-wider">PICK UP</span>
+                  <p className="font-extrabold text-zinc-900">{activeOffer.origin.label}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <MapPin size={14} className="text-rose-500 shrink-0 mt-0.5" />
+                <MapPin size={14} className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold text-zinc-500 block text-[10px] uppercase tracking-wider">DROP OFF</span>
-                  <p className="font-bold text-zinc-800">{activeOffer.destination.label}</p>
+                  <span className="font-bold text-zinc-600 block text-[10px] uppercase tracking-wider">DROP OFF</span>
+                  <p className="font-extrabold text-zinc-900">{activeOffer.destination.label}</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-center text-xs">
-              <div className="bg-white p-2 rounded-xl border border-zinc-100">
-                <span className="text-zinc-400 block text-[9px] font-bold uppercase">Distance</span>
-                <span className="font-bold text-zinc-800">{activeOffer.distance} km</span>
+              <div className="bg-white p-2 rounded-xl border border-[#E5DFD3]">
+                <span className="text-zinc-600 block text-[9px] font-bold uppercase">Distance</span>
+                <span className="font-extrabold text-zinc-900">{activeOffer.distance} km</span>
               </div>
-              <div className="bg-white p-2 rounded-xl border border-zinc-100">
-                <span className="text-zinc-400 block text-[9px] font-bold uppercase">Estimated Duration</span>
-                <span className="font-bold text-zinc-800">{activeOffer.duration} mins</span>
+              <div className="bg-white p-2 rounded-xl border border-[#E5DFD3]">
+                <span className="text-zinc-600 block text-[9px] font-bold uppercase">Estimated Duration</span>
+                <span className="font-extrabold text-zinc-900">{activeOffer.duration} mins</span>
               </div>
             </div>
 
@@ -388,14 +507,14 @@ export default function DriverPanel({
             <div className="grid grid-cols-2 gap-2 pt-1.5">
               <button
                 onClick={handleDeclineOffer}
-                className="py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl text-xs transition cursor-pointer"
+                className="py-3 bg-white border border-[#E5DFD3] hover:bg-[#FAF7F2] text-zinc-800 font-extrabold rounded-xl text-xs transition cursor-pointer"
                 id="driver-decline-offer-btn"
               >
                 Decline
               </button>
               <button
                 onClick={handleAcceptOffer}
-                className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                className="py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded-xl text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-md"
                 id="driver-accept-offer-btn"
               >
                 <Check size={14} /> Accept Offer
@@ -410,11 +529,11 @@ export default function DriverPanel({
         {activeTrip && (
           <div className="space-y-4">
             {/* Nav Banner header */}
-            <div className="bg-zinc-950 text-white p-3.5 rounded-xl border border-zinc-800 flex items-center gap-3">
-              <Navigation size={22} className="text-blue-400 animate-pulse shrink-0 transform rotate-45" />
+            <div className="bg-zinc-900 text-white p-3.5 rounded-xl border border-zinc-800 flex items-center gap-3">
+              <Navigation size={22} className="text-emerald-400 animate-pulse shrink-0 transform rotate-45" />
               <div className="flex-1 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Navigation Guide</span>
-                <p className="font-semibold text-xs truncate">
+                <p className="font-bold text-xs truncate text-zinc-100">
                   {driverState === 'PICKING_UP' && `Driving to pick up ${activeTrip.passengerName}`}
                   {driverState === 'WAITING_PASSENGER' && `Arrived! Waiting for ${activeTrip.passengerName} to enter`}
                   {driverState === 'DRIVING' && `Navigating to ${activeTrip.destination.label}`}
@@ -423,45 +542,45 @@ export default function DriverPanel({
             </div>
 
             {/* Route Map Card */}
-            <div className="bg-zinc-50 p-3.5 rounded-xl border border-zinc-150 space-y-3">
+            <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E5DFD3] space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Active Leg progress</span>
-                <span className="font-bold text-zinc-800">{Math.round(driveProgress * 100)}% Complete</span>
+                <span className="text-zinc-600 font-bold uppercase text-[10px] tracking-wider">Active Leg progress</span>
+                <span className="font-extrabold text-zinc-900">{Math.round(driveProgress * 100)}% Complete</span>
               </div>
 
               {/* simulated route indicator */}
-              <div className="w-full bg-zinc-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-[#F2EDE4] rounded-full h-2.5 overflow-hidden border border-[#E5DFD3]">
                 <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300"
                   style={{ width: `${driveProgress * 100}%` }}
                 />
               </div>
 
-              <div className="space-y-2 text-xs pt-1.5 border-t border-zinc-150">
+              <div className="space-y-2 text-xs pt-1.5 border-t border-[#E5DFD3]">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Destination:</span>
-                  <span className="font-bold text-zinc-800">
+                  <span className="text-zinc-600 font-medium">Destination:</span>
+                  <span className="font-extrabold text-zinc-900">
                     {driverState === 'PICKING_UP' ? activeTrip.origin.label : activeTrip.destination.label}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Payout:</span>
-                  <span className="font-bold text-emerald-600 text-sm">₦{activeTrip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-zinc-600 font-medium">Payout:</span>
+                  <span className="font-extrabold text-emerald-700 text-sm">₦{activeTrip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
 
             {/* Drive Simulation controller - Manual steps or Auto-Tick triggers */}
-            <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-150 text-center space-y-3">
-              <h4 className="text-xs font-bold text-zinc-700">Trip Progression Trigger</h4>
-              <p className="text-[11px] text-zinc-400 max-w-[200px] mx-auto">
+            <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] text-center space-y-3">
+              <h4 className="text-xs font-extrabold text-zinc-900">Trip Progression Trigger</h4>
+              <p className="text-[11px] text-zinc-600 font-medium max-w-[200px] mx-auto">
                 In this simulator, drive times are condensed. Auto-drive progress updates coordinate movements.
               </p>
 
               {driverState === 'WAITING_PASSENGER' && (
                 <button
                   onClick={handleStartRide}
-                  className="w-full py-3 bg-zinc-950 hover:bg-zinc-900 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
                   id="driver-start-trip-btn"
                 >
                   <Car size={14} /> Passenger Onboard - Start Ride
@@ -471,7 +590,7 @@ export default function DriverPanel({
               {driverState === 'DRIVING' && driveProgress >= 1.0 && (
                 <button
                   onClick={handleCompletePayout}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md animate-bounce"
+                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md animate-bounce"
                   id="driver-complete-trip-btn"
                 >
                   <CircleCheck size={14} /> Arrived - Complete Ride & Collect Payout
@@ -479,8 +598,8 @@ export default function DriverPanel({
               )}
 
               {(driverState === 'PICKING_UP' || driverState === 'DRIVING') && (
-                <div className="text-xs text-zinc-500 flex items-center justify-center gap-1 font-mono py-1.5 bg-white rounded-lg border border-zinc-100">
-                  <Clock size={12} className="animate-spin" />
+                <div className="text-xs text-zinc-700 font-bold flex items-center justify-center gap-1 font-mono py-1.5 bg-white rounded-lg border border-[#E5DFD3]">
+                  <Clock size={12} className="animate-spin text-emerald-600" />
                   <span>GPS Auto-driving vehicle...</span>
                 </div>
               )}
@@ -493,36 +612,36 @@ export default function DriverPanel({
            ========================================== */}
         {driverState === 'SUCCESS' && recentEarnings > 0 && (
           <div className="py-6 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-inner animate-bounce">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center mx-auto text-emerald-700 shadow-xs animate-bounce">
               <CircleCheck size={36} />
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-lg font-black text-zinc-800">Trip Completed!</h3>
-              <p className="text-xs text-zinc-500">
+              <h3 className="text-lg font-extrabold text-zinc-900">Trip Completed!</h3>
+              <p className="text-xs text-zinc-600 font-medium">
                 You safely deposited the passenger. Payout processed successfully.
               </p>
             </div>
 
             {/* Receipt receipt statement */}
-            <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-150 space-y-2.5 max-w-[280px] mx-auto text-left text-xs">
+            <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] space-y-2.5 max-w-[280px] mx-auto text-left text-xs shadow-xs">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Net Fare Payout:</span>
-                <span className="font-extrabold text-zinc-800">₦{recentEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-zinc-600 font-medium">Net Fare Payout:</span>
+                <span className="font-extrabold text-zinc-900">₦{recentEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Service Fee cut (0% promotional):</span>
-                <span className="font-extrabold text-zinc-400">-₦0.00</span>
+                <span className="text-zinc-600 font-medium">Service Fee cut (0% promotional):</span>
+                <span className="font-extrabold text-zinc-500">-₦0.00</span>
               </div>
-              <div className="flex justify-between pt-1.5 border-t border-zinc-200">
-                <span className="font-bold text-zinc-700">Total Transferred:</span>
-                <span className="font-black text-emerald-600 text-sm">₦{recentEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <div className="flex justify-between pt-1.5 border-t border-[#E5DFD3]">
+                <span className="font-bold text-zinc-800">Total Transferred:</span>
+                <span className="font-extrabold text-emerald-700 text-sm">₦{recentEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
 
             <button
               onClick={handleResetToIdle}
-              className="px-6 py-2.5 bg-zinc-950 hover:bg-zinc-900 text-white font-semibold text-xs rounded-xl transition cursor-pointer"
+              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
               id="driver-payout-dismiss-btn"
             >
               Back to Dashboard
@@ -532,7 +651,7 @@ export default function DriverPanel({
       </div>
 
       {/* Footer Info */}
-      <div className="bg-zinc-50 p-2.5 text-center text-[10px] text-zinc-400 border-t border-zinc-150 flex items-center justify-center gap-1 font-mono">
+      <div className="bg-[#FAF7F2] p-2.5 text-center text-[10px] text-zinc-600 border-t border-[#E5DFD3] flex items-center justify-center gap-1 font-mono font-semibold">
         <span>Instant Cashout synced with Stripe Express</span>
       </div>
     </div>

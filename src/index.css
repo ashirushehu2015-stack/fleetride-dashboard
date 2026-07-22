@@ -6,3 +6,9 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+body {
+  background-color: #faf7f2;
+  color: #18181b;
+  font-family: var(--font-sans);
+}
+

@@ -324,49 +324,53 @@ export default function LandingPage({
       a: "The Uber Simulator is a double-sided urban workspace. When you book a ride in 'Rider Mode', the simulator server routes the request to your dynamic driver fleet. It matches verified, active drivers in real-time, displays live coordinate travel sequences on our interactive vector maps, and processes dynamic credit-debit account balances upon safe arrival."
     },
     {
-      q: "Which regions are currently covered by the operations?",
-      a: "We currently cover major economic and administrative metropolitan nodes across Nigeria, including Lagos (Commercial Hub), Abuja (FCT), Port Harcourt (Oil City), Kano (Ancient Hub), Enugu (Coal City), and Gusau (Northern Gateway)."
+      q: "Which states and regions are covered by the operations?",
+      a: "We currently cover 17 key states and commercial hubs across Nigeria—including Lagos, Abuja FCT, Rivers (Port Harcourt), Kano, Enugu, Kaduna, Sokoto, Kebbi, Katsina, Niger, Nasarawa, Jigawa, Gombe, Borno, Adamawa, Yobe, and Zamfara (Gusau). Both intrastate (intra-city) and interstate (cross-country) travel corridors are fully active."
+    },
+    {
+      q: "How do Intrastate and Interstate bookings differ?",
+      a: "Intrastate bookings cover fast, localized intra-city trips within any covered state sector. Interstate bookings connect major state terminals and hubs with highway distance routing, state border clearance fees, and dedicated cross-state vehicle classes."
     },
     {
       q: "How can I register as a driver and accumulate earnings?",
-      a: "Simply click 'Get Started' or 'Sign In', select the 'Driver' tab, and choose 'Create Account'. You can register custom vehicle specifications, define a license plate number, and select vehicle classes (such as Uber Moto, UberX, Comfort, or Premium Black). Once registered, your profile is added to the simulation loop and can be summoned dynamically."
+      a: "Simply click 'Get Started' or 'Sign In', select the 'Driver' tab, and choose 'Create Account'. You can register custom vehicle specifications, define a license plate number, and select vehicle classes (such as ZamTaxi Standard, Comfort, or Premium). Once registered, your profile is added to the simulation loop and can be summoned dynamically."
     },
     {
-      q: "What safety protocols are implemented for municipal commuters?",
-      a: "Our console includes background audit logs, multi-factor credential pre-authorizations, real-time vehicle route status trackers, and an instantaneous system-wide 'Surge Switch' to manage extreme weather, heavy municipal congestion, or safety contingencies gracefully."
+      q: "What safety protocols are implemented for commuters?",
+      a: "Our console includes background audit logs, multi-factor credential pre-authorizations, real-time vehicle route status trackers, and an instantaneous system-wide 'Surge Switch' to manage extreme weather, heavy congestion, or safety contingencies gracefully."
     }
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800 selection:text-white relative overflow-x-hidden" id="landing-page-root">
+    <div className="min-h-screen bg-[#FAF7F2] text-zinc-900 flex flex-col font-sans selection:bg-zinc-300 selection:text-zinc-900 relative overflow-x-hidden" id="landing-page-root">
       
       {/* BACKGROUND ACCENTS */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-zinc-800/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* STICKY TOP NAVIGATION BAR */}
-      <nav className="sticky top-0 z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 px-6 py-4 transition-all">
+      <nav className="sticky top-0 z-40 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#E5DFD3] px-6 py-4 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           
           {/* Logo Brand */}
           <div className="flex items-center gap-3">
-            <div className="bg-white text-zinc-950 w-9 h-9 rounded-xl flex items-center justify-center font-black tracking-tighter text-xl shadow-lg shadow-white/5">
+            <div className="bg-zinc-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-black tracking-tighter text-xl shadow-xs">
               U
             </div>
             <div>
-              <span className="text-white font-extrabold text-base tracking-tight block">Uber Nigeria</span>
-              <span className="text-emerald-500 text-[9px] uppercase font-bold tracking-widest block -mt-0.5">
+              <span className="text-zinc-900 font-extrabold text-base tracking-tight block">Uber Nigeria</span>
+              <span className="text-emerald-700 text-[9px] uppercase font-bold tracking-widest block -mt-0.5">
                 National Fleet Simulator
               </span>
             </div>
           </div>
 
           {/* Nav Links (Desktop) */}
-          <div className="hidden md:flex items-center gap-8 text-xs font-semibold text-zinc-400">
+          <div className="hidden md:flex items-center gap-8 text-xs font-bold text-zinc-600">
             <a 
               href="#hero" 
               onClick={() => setActiveNav('home')}
-              className={`transition hover:text-white ${activeNav === 'home' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+              className={`transition hover:text-zinc-900 ${activeNav === 'home' ? 'text-zinc-900 border-b-2 border-emerald-700 pb-1' : ''}`}
             >
               Home
             </a>
@@ -376,7 +380,7 @@ export default function LandingPage({
                 setActiveNav('pricing');
                 setTravelMode('municipal');
               }}
-              className={`transition hover:text-white ${activeNav === 'pricing' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+              className={`transition hover:text-zinc-900 ${activeNav === 'pricing' ? 'text-zinc-900 border-b-2 border-emerald-700 pb-1' : ''}`}
             >
               Intrastate
             </a>
@@ -386,21 +390,21 @@ export default function LandingPage({
                 setActiveNav('interstate');
                 setTravelMode('interstate');
               }}
-              className={`transition hover:text-white ${activeNav === 'interstate' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+              className={`transition hover:text-zinc-900 ${activeNav === 'interstate' ? 'text-zinc-900 border-b-2 border-emerald-700 pb-1' : ''}`}
             >
               Interstate
             </a>
             <a 
               href="#cities" 
               onClick={() => setActiveNav('cities')}
-              className={`transition hover:text-white ${activeNav === 'cities' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+              className={`transition hover:text-zinc-900 ${activeNav === 'cities' ? 'text-zinc-900 border-b-2 border-emerald-700 pb-1' : ''}`}
             >
               Active Cities
             </a>
             <a 
               href="#faq" 
               onClick={() => setActiveNav('faq')}
-              className={`transition hover:text-white ${activeNav === 'faq' ? 'text-white border-b-2 border-emerald-500 pb-1' : ''}`}
+              className={`transition hover:text-zinc-900 ${activeNav === 'faq' ? 'text-zinc-900 border-b-2 border-emerald-700 pb-1' : ''}`}
             >
               Help & FAQ
             </a>
@@ -410,14 +414,14 @@ export default function LandingPage({
           <div className="flex items-center gap-3">
             <button 
               onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
-              className="text-xs font-bold text-zinc-300 hover:text-white px-3.5 py-2 transition rounded-lg hover:bg-zinc-900 cursor-pointer"
+              className="text-xs font-extrabold text-zinc-800 hover:text-zinc-950 px-3.5 py-2 transition rounded-lg hover:bg-white border border-transparent hover:border-[#E5DFD3] cursor-pointer"
               id="landing-signin-btn"
             >
               Sign In
             </button>
             <button 
               onClick={() => { selectLoginRole('rider'); setAuthMode('signup'); setIsLoginOpen(true); }}
-              className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center gap-1.5 cursor-pointer"
+              className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
               id="landing-getstarted-btn"
             >
               Get Started
@@ -432,35 +436,35 @@ export default function LandingPage({
         <div className="lg:col-span-7 space-y-6">
           
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wider uppercase">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-extrabold tracking-wider uppercase">
             <Sparkles size={11} className="animate-pulse" />
             Double-Sided Urban Ride-Share Console
           </div>
 
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-none">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-zinc-950 tracking-tight leading-none">
             Beat the Traffic. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-200">
+            <span className="text-emerald-700">
               Enjoy the Ride.
             </span>
           </h2>
 
-          <p className="text-zinc-400 text-sm md:text-base max-w-xl leading-relaxed">
-            Experience the state-of-the-art dispatch simulation built for Gusau, Talata Mafara, and Kaura Namoda. Book trips, manage live verified vehicle fleets, monitor GPS coordinate updates, and experience true admin control.
+          <p className="text-zinc-700 font-medium text-sm md:text-base max-w-xl leading-relaxed">
+            Experience state-of-the-art dispatch simulation across all covered states in Nigeria. Seamlessly book intrastate city runs and long-distance interstate routes, manage live verified vehicle fleets, monitor GPS coordinate updates, and experience true admin control.
           </p>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-4 py-3 border-y border-zinc-900 max-w-lg">
+          <div className="grid grid-cols-3 gap-4 py-3 border-y border-[#E5DFD3] max-w-lg">
             <div>
-              <span className="block text-xl font-bold text-white tracking-tight">{drivers.length}</span>
-              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Active Drivers</span>
+              <span className="block text-xl font-extrabold text-zinc-900 tracking-tight">17 States</span>
+              <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">Covered Regions</span>
             </div>
             <div>
-              <span className="block text-xl font-bold text-white tracking-tight">{passengers.length}</span>
-              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Riders Signed Up</span>
+              <span className="block text-xl font-extrabold text-zinc-900 tracking-tight">Intra & Inter</span>
+              <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">Route Modes</span>
             </div>
             <div>
-              <span className="block text-xl font-bold text-emerald-400 tracking-tight">₦400</span>
-              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Base Moto Fare</span>
+              <span className="block text-xl font-extrabold text-emerald-700 tracking-tight">{drivers.length} Active</span>
+              <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">Verified Drivers</span>
             </div>
           </div>
 
@@ -780,12 +784,12 @@ export default function LandingPage({
       {/* ACTIVE CITIES CONTAINER SHIFT CARD */}
       <section id="cities" className="max-w-7xl mx-auto py-16 px-6 space-y-10">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs uppercase font-extrabold text-emerald-500 tracking-wider">INTRASTATE NETWORKS</span>
-          <h3 className="text-3xl font-extrabold text-white tracking-tight">
-            Supported Operational Sectors
+          <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">COVERED STATES & NETWORKS</span>
+          <h3 className="text-3xl font-extrabold text-zinc-950 tracking-tight">
+            17 States & Federal Operational Sectors
           </h3>
-          <p className="text-zinc-400 text-xs">
-            Our navigation engine integrates major economic and administrative metropolitan zones across Nigeria. Switch intrastate networks instantly inside the ride console.
+          <p className="text-zinc-700 font-medium text-xs">
+            Our navigation engine integrates 17 major state capitals and economic hubs across Nigeria for both intrastate (city-wide) and interstate (cross-boundary) travel.
           </p>
         </div>
 
