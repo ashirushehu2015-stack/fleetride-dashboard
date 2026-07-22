@@ -30,6 +30,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Location, VehicleType, UserProfile } from '../types';
 import { CITIES, VEHICLE_CONFIGS } from '../data';
+import ZamTaxiLogo from './ZamTaxiLogo';
 // @ts-ignore
 import zamtaxiFront from '../assets/images/zamtaxi_front_1784738289926.jpg';
 // @ts-ignore
@@ -52,6 +53,8 @@ import zamtaxiBoldGreenFront from '../assets/images/zamtaxi_bold_green_front_178
 import airportTransferPassenger from '../assets/images/airport_transfer_passenger_1784740265459.jpg';
 // @ts-ignore
 import zamtaxiAirportTransferGreen from '../assets/images/zamtaxi_airport_transfer_green_1784740477851.jpg';
+// @ts-ignore
+import zamtaxiEvBossPoster from '../assets/images/zamtaxi_ev_boss_poster_1784742118419.jpg';
 
 interface LandingPageProps {
   passengers: any[];
@@ -82,8 +85,16 @@ export default function LandingPage({
   
   // Login Modal State
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [authScope, setAuthScope] = useState<'all' | 'rider-only' | 'driver-only'>('rider-only');
   const [loginRole, setLoginRole] = useState<'rider' | 'driver' | 'admin'>('rider');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+
+  const openAuthModal = (scope: 'all' | 'rider-only' | 'driver-only', role: 'rider' | 'driver' | 'admin', mode: 'signin' | 'signup') => {
+    setAuthScope(scope);
+    selectLoginRole(role);
+    setAuthMode(mode);
+    setIsLoginOpen(true);
+  };
   
   // Quick Estimates Form State
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('X');
@@ -342,7 +353,7 @@ export default function LandingPage({
   const FAQS = [
     {
       q: "How does the double-sided simulation system operate?",
-      a: "The Uber Simulator is a double-sided urban workspace. When you book a ride in 'Rider Mode', the simulator server routes the request to your dynamic driver fleet. It matches verified, active drivers in real-time, displays live coordinate travel sequences on our interactive vector maps, and processes dynamic credit-debit account balances upon safe arrival."
+      a: "The ZamTaxi Console is a double-sided urban workspace. When you book a ride in 'Rider Mode', the simulator server routes the request to your dynamic driver fleet. It matches verified, active drivers in real-time, displays live coordinate travel sequences on our interactive vector maps, and processes dynamic credit-debit account balances upon safe arrival."
     },
     {
       q: "Which states and regions are covered by the operations?",
@@ -375,15 +386,7 @@ export default function LandingPage({
           
           {/* Logo Brand */}
           <div className="flex items-center gap-3">
-            <div className="bg-zinc-900 text-white w-9 h-9 rounded-xl flex items-center justify-center font-black tracking-tighter text-xl shadow-xs">
-              U
-            </div>
-            <div>
-              <span className="text-zinc-900 font-extrabold text-base tracking-tight block">Uber Nigeria</span>
-              <span className="text-emerald-700 text-[9px] uppercase font-bold tracking-widest block -mt-0.5">
-                National Fleet Simulator
-              </span>
-            </div>
+            <ZamTaxiLogo size="md" showSubtext={true} />
           </div>
 
           {/* Nav Links (Desktop) */}
@@ -432,21 +435,22 @@ export default function LandingPage({
           </div>
 
           {/* Nav Right CTA */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button 
-              onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
-              className="text-xs font-extrabold text-zinc-800 hover:text-zinc-950 px-3.5 py-2 transition rounded-lg hover:bg-white border border-transparent hover:border-[#E5DFD3] cursor-pointer"
+              onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
+              className="text-xs font-extrabold text-zinc-900 hover:text-emerald-950 px-3.5 py-2 transition rounded-xl bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 cursor-pointer shadow-xs"
               id="landing-signin-btn"
             >
-              Sign In
+              <User size={13} className="text-emerald-800" />
+              Rider Portal
             </button>
             <button 
-              onClick={() => { selectLoginRole('rider'); setAuthMode('signup'); setIsLoginOpen(true); }}
-              className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+              onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-4 py-2 rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
               id="landing-getstarted-btn"
             >
-              Get Started
-              <ArrowRight size={13} />
+              <Car size={13} />
+              Driver Portal
             </button>
           </div>
         </div>
@@ -457,7 +461,7 @@ export default function LandingPage({
         <div className="lg:col-span-7 space-y-6">
           
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-extrabold tracking-wider uppercase">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-[10px] font-black tracking-wider uppercase">
             <Sparkles size={11} className="animate-pulse" />
             Double-Sided Urban Ride-Share Console
           </div>
@@ -469,7 +473,7 @@ export default function LandingPage({
             </span>
           </h2>
 
-          <p className="text-zinc-700 font-medium text-sm md:text-base max-w-xl leading-relaxed">
+          <p className="text-zinc-700 font-semibold text-sm md:text-base max-w-xl leading-relaxed">
             Experience state-of-the-art dispatch simulation across all covered states in Nigeria. Seamlessly book intrastate city runs and long-distance interstate routes, manage live verified vehicle fleets, monitor GPS coordinate updates, and experience true admin control.
           </p>
 
@@ -492,25 +496,25 @@ export default function LandingPage({
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center gap-4">
             <button
-              onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
-              className="bg-white text-zinc-950 hover:bg-zinc-200 text-xs font-extrabold px-6 py-3.5 rounded-xl transition shadow-lg shadow-white/5 flex items-center gap-2 cursor-pointer"
+              onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-6 py-3.5 rounded-xl transition shadow-lg shadow-emerald-900/20 flex items-center gap-2 cursor-pointer"
               id="hero-book-ride-cta"
             >
-              <User size={14} />
+              <User size={15} />
               Book a Ride (Rider Mode)
             </button>
             <button
-              onClick={() => { selectLoginRole('driver'); setAuthMode('signin'); setIsLoginOpen(true); }}
-              className="bg-zinc-900 text-white border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 text-xs font-extrabold px-6 py-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer"
+              onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
+              className="bg-zinc-950 text-white border-2 border-emerald-600/50 hover:bg-zinc-900 text-xs font-black px-6 py-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md"
               id="hero-driver-mode-cta"
             >
-              <Car size={14} />
-              Earn on the Road (Driver Mode)
+              <Car size={15} className="text-emerald-400" />
+              Drive & Earn (Driver Mode)
             </button>
           </div>
 
-          <p className="text-[11px] text-zinc-600 flex items-center gap-1.5">
-            <ShieldCheck size={13} className="text-emerald-500" />
+          <p className="text-[11px] text-zinc-600 font-semibold flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-emerald-600" />
             No credit card required. Preloaded simulation balances.
           </p>
         </div>
@@ -554,6 +558,139 @@ export default function LandingPage({
             </div>
 
           </div>
+        </div>
+      </section>
+
+      {/* CHOOSE YOUR PORTAL: SEPARATED RIDER MODE VS DRIVER MODE GATEWAY */}
+      <section id="portal-selector" className="py-16 px-6 max-w-7xl mx-auto space-y-10">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-950 text-[11px] font-mono font-black px-4 py-1.5 rounded-full border border-emerald-300 tracking-wider uppercase shadow-xs">
+            Clear Portal Separation
+          </div>
+          <h3 className="text-3xl sm:text-4xl font-black text-zinc-950 tracking-tight">
+            Choose Your Portal
+          </h3>
+          <p className="text-zinc-700 text-sm font-semibold leading-relaxed">
+            Select your role below to launch directly into either the Passenger Ride Console or the ZamTaxi EV Driver Operations Platform.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          {/* RIDER MODE PATHWAY CARD */}
+          <div className="bg-[#FAF7F2] border-2 border-emerald-600/40 rounded-3xl p-8 space-y-6 flex flex-col justify-between shadow-xl hover:shadow-2xl transition group relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-emerald-700 text-white text-[10px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-wider shadow-sm">
+              Passenger Access
+            </div>
+
+            <div className="space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-700/20 group-hover:scale-110 transition duration-300">
+                <User size={28} />
+              </div>
+
+              <div>
+                <span className="text-xs font-mono font-black uppercase text-emerald-800 tracking-widest block">
+                  Rider Mode Portal
+                </span>
+                <h4 className="text-2xl font-black text-zinc-950 mt-1">
+                  Book Rides & Travel Intrastate/Interstate
+                </h4>
+                <p className="text-zinc-700 text-xs sm:text-sm font-semibold leading-relaxed mt-2">
+                  Designed for passengers, commuters, and travelers across Gusau, Talata Mafara, Kaura Namoda, Abuja, Kano, and 17 state corridors.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 pt-2 border-t border-[#E5DFD3] text-xs font-extrabold text-zinc-800">
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  <span>Upfront fare calculator & transparent pricing</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  <span>1-Tap dispatch with live GPS coordinate tracking</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  <span>Preloaded simulation wallet, cash, & bank transfer</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  <span>SOS emergency shield & driver rating system</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm py-4 px-6 rounded-2xl transition shadow-lg shadow-emerald-800/20 flex items-center justify-center gap-2 cursor-pointer"
+                id="portal-path-rider-btn"
+              >
+                <User size={16} />
+                Launch Rider Mode (Book a Ride)
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* DRIVER MODE PATHWAY CARD */}
+          <div className="bg-zinc-950 border-2 border-emerald-500/50 rounded-3xl p-8 space-y-6 flex flex-col justify-between shadow-2xl hover:shadow-2xl transition group relative overflow-hidden text-white">
+            <div className="absolute top-0 right-0 bg-emerald-500 text-zinc-950 text-[10px] font-black px-4 py-1.5 rounded-bl-2xl uppercase tracking-wider shadow-sm">
+              Driver & EV Partner Access
+            </div>
+
+            <div className="space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow-lg group-hover:scale-110 transition duration-300">
+                <Car size={28} />
+              </div>
+
+              <div>
+                <span className="text-xs font-mono font-black uppercase text-emerald-400 tracking-widest block">
+                  Driver Mode Portal
+                </span>
+                <h4 className="text-2xl font-black text-white mt-1">
+                  Drive 100% Electric ZamTaxi & Earn
+                </h4>
+                <p className="text-zinc-300 text-xs sm:text-sm font-semibold leading-relaxed mt-2">
+                  Empowering drivers with zero petrol expense, government-backed micro-financing, live ride dispatch, and dynamic daily wallet payouts.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 pt-2 border-t border-zinc-800 text-xs font-bold text-zinc-200">
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <span>100% Electric EV fleet — Zero fuel costs</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <span>Zamfara State Commercial EV financing support</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <span>Live ride accept/decline dispatch console</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <span>Direct instant wallet withdrawals & trip stats</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-sm py-4 px-6 rounded-2xl transition shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                id="portal-path-driver-btn"
+              >
+                <Car size={16} />
+                Launch Driver Mode (Apply & Earn)
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -1024,10 +1161,82 @@ export default function LandingPage({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
+                onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition cursor-pointer shadow-lg shadow-emerald-950/30 inline-flex items-center gap-2.5"
               >
                 View all airport transfers
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ZAMFARA COMMERCIAL EV INITIATIVE - BE YOUR OWN BOSS CAMPAIGN SECTION */}
+      <section className="bg-[#FAF7F2] border-t border-[#E5DFD3] py-16 px-6 sm:px-12">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-[#FAF7F2] border border-[#E5DFD3] rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+          
+          {/* Ambient Milky / Emerald Gradient Accents */}
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          {/* Left: Campaign Poster Image featuring Man in Blue Kaftan & EV Taxi */}
+          <div className="md:col-span-5 flex justify-center">
+            <div className="relative group w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border border-emerald-600/30 bg-zinc-950 p-1">
+              <img
+                src={zamtaxiEvBossPoster}
+                alt="Be YOUR Own Boss - Zamfara Commercial EV Initiative"
+                className="w-full h-auto aspect-[3/4] object-cover rounded-xl group-hover:scale-102 transition duration-500"
+                referrerPolicy="no-referrer"
+              />
+              
+              <div className="absolute top-3.5 left-3.5 bg-emerald-800/95 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-md border border-emerald-400/30 z-10">
+                Official Government Initiative
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Campaign Description & Onboarding CTA with High-Contrast Dark Text */}
+          <div className="md:col-span-7 space-y-6 text-left">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-950 text-xs font-mono font-black px-4 py-1.5 rounded-full border border-emerald-300 tracking-wider uppercase shadow-xs">
+                Sponsored by Zamfara State Government
+              </div>
+              
+              <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-zinc-950 tracking-tight leading-tight">
+                Be <span className="text-emerald-700 underline decoration-emerald-500/50">YOUR Own</span> BOSS
+              </h3>
+
+              <h4 className="text-xl sm:text-2xl font-black text-emerald-800">
+                Zamfara Commercial EV Initiative
+              </h4>
+
+              <p className="text-zinc-800 text-sm sm:text-base leading-relaxed font-semibold">
+                Empowering local drivers with 100% electric taxis, zero fuel overhead, government-backed micro-financing, and flexible daily returns across Gusau, Talata Mafara, Kaura Namoda, and interstate corridors.
+              </p>
+            </div>
+
+            {/* High Contrast Key Metrics */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#E5DFD3]">
+              <div className="bg-white border border-[#E2DBCF] p-4 rounded-xl shadow-xs">
+                <span className="block text-xl font-black text-emerald-950">100% Electric</span>
+                <span className="text-xs text-zinc-700 font-bold block mt-0.5">Zero petrol costs & low maintenance</span>
+              </div>
+              <div className="bg-white border border-[#E2DBCF] p-4 rounded-xl shadow-xs">
+                <span className="block text-xl font-black text-emerald-950">Daily Payouts</span>
+                <span className="text-xs text-zinc-700 font-bold block mt-0.5">Direct wallet deposit & state support</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm px-7 py-3.5 rounded-xl transition shadow-lg shadow-emerald-700/20 inline-flex items-center gap-2 cursor-pointer"
+                id="apply-ev-driver-btn"
+              >
+                Apply as EV Driver Now
+                <ArrowRight size={16} />
               </button>
             </div>
           </div>
@@ -1154,15 +1363,7 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           
           <div className="flex items-center gap-3">
-            <div className="bg-white text-zinc-950 w-8 h-8 rounded-xl flex items-center justify-center font-black tracking-tighter text-lg">
-              U
-            </div>
-            <div>
-              <span className="text-white font-extrabold text-xs block">Uber Nigeria</span>
-              <span className="text-zinc-500 text-[9px] uppercase font-mono block">
-                © 2026 NIGERIAN FEDERAL TRANSIT AUTHORITY
-              </span>
-            </div>
+            <ZamTaxiLogo size="sm" showSubtext={true} />
           </div>
 
           {/* Legal and Support Links */}
@@ -1224,9 +1425,17 @@ export default function LandingPage({
               {/* Header tab choice */}
               <div className="bg-zinc-950 border-b border-zinc-800/80 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Lock size={14} className="text-emerald-400" />
+                  {authScope === 'rider-only' ? (
+                    <User size={16} className="text-emerald-400" />
+                  ) : (
+                    <Car size={16} className="text-emerald-400" />
+                  )}
                   <span className="text-xs uppercase font-extrabold text-white tracking-widest">
-                    Authentication Hub
+                    {authScope === 'rider-only'
+                      ? 'Passenger Ride Booking Portal'
+                      : authScope === 'driver-only'
+                      ? 'ZamTaxi EV Driver Onboarding'
+                      : 'Authentication Hub'}
                   </span>
                 </div>
                 <button
@@ -1237,48 +1446,74 @@ export default function LandingPage({
                 </button>
               </div>
 
-              {/* Role Switches */}
-              <div className="grid grid-cols-3 bg-zinc-950/40 border-b border-zinc-800/80 p-2 gap-1 text-center">
-                <button
-                  type="button"
-                  onClick={() => selectLoginRole('rider')}
-                  className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
-                    loginRole === 'rider'
-                      ? 'bg-white text-zinc-950 font-black'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
-                  }`}
-                  id="auth-role-rider"
-                >
-                  <User size={13} />
-                  Passenger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectLoginRole('driver')}
-                  className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
-                    loginRole === 'driver'
-                      ? 'bg-white text-zinc-950 font-black'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
-                  }`}
-                  id="auth-role-driver"
-                >
-                  <Car size={13} />
-                  Driver
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectLoginRole('admin')}
-                  className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
-                    loginRole === 'admin'
-                      ? 'bg-white text-zinc-950 font-black'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
-                  }`}
-                  id="auth-role-admin"
-                >
-                  <ShieldCheck size={13} />
-                  Admin
-                </button>
-              </div>
+              {/* Role Switches or Dedicated Scope Banner */}
+              {authScope === 'rider-only' ? (
+                <div className="bg-emerald-950/90 border-b border-emerald-500/30 px-6 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-black uppercase text-emerald-300 tracking-wider">
+                      Passenger Access Portal
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase text-emerald-400 bg-emerald-900/90 px-2.5 py-1 rounded-md border border-emerald-500/40">
+                    Passenger Mode Only
+                  </span>
+                </div>
+              ) : authScope === 'driver-only' ? (
+                <div className="bg-emerald-950/90 border-b border-emerald-500/30 px-6 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-black uppercase text-emerald-300 tracking-wider">
+                      Zamfara EV Driver Onboarding Portal
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase text-emerald-400 bg-emerald-900/90 px-2.5 py-1 rounded-md border border-emerald-500/40">
+                    Driver Mode Only
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 bg-zinc-950/40 border-b border-zinc-800/80 p-2 gap-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => selectLoginRole('rider')}
+                    className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                      loginRole === 'rider'
+                        ? 'bg-white text-zinc-950 font-black'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                    }`}
+                    id="auth-role-rider"
+                  >
+                    <User size={13} />
+                    Passenger
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectLoginRole('driver')}
+                    className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                      loginRole === 'driver'
+                        ? 'bg-white text-zinc-950 font-black'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                    }`}
+                    id="auth-role-driver"
+                  >
+                    <Car size={13} />
+                    Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectLoginRole('admin')}
+                    className={`py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                      loginRole === 'admin'
+                        ? 'bg-white text-zinc-950 font-black'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                    }`}
+                    id="auth-role-admin"
+                  >
+                    <ShieldCheck size={13} />
+                    Admin
+                  </button>
+                </div>
+              )}
 
               {/* Inner Auth Workspace */}
               <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">

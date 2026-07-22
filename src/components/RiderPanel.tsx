@@ -625,7 +625,7 @@ export default function RiderPanel({
                   className="w-full bg-zinc-900 text-white font-extrabold py-3.5 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
                   id="book-uber-ride-btn"
                 >
-                  Book {VEHICLE_CONFIGS.find((v) => v.id === selectedVehicle)?.name || 'UberX'}
+                  Book {VEHICLE_CONFIGS.find((v) => v.id === selectedVehicle)?.name || 'ZamTaxi Green'}
                   <ArrowRight size={16} />
                 </button>
               </div>

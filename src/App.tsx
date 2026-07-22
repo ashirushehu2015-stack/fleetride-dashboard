@@ -8,6 +8,7 @@ import SettingsPanel from './components/SettingsPanel';
 import DashboardPanel from './components/DashboardPanel';
 import UserManagementPanel from './components/UserManagementPanel';
 import LandingPage from './components/LandingPage';
+import ZamTaxiLogo from './components/ZamTaxiLogo';
 import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert } from 'lucide-react';
 // @ts-ignore
 import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
@@ -397,8 +398,8 @@ export default function App() {
             ...matchedMock,
             vehicleType: vehicleType as any,
             vehicleName: matchedMock.vehicleName.includes('Sebring')
-              ? `${vehicleConf?.name || 'UberX'} • ${matchedMock.vehicleName}`
-              : `${vehicleConf?.name || 'UberX'} • ${matchedMock.vehicleName}`,
+              ? `${vehicleConf?.name || 'ZamTaxi Green'} • ${matchedMock.vehicleName}`
+              : `${vehicleConf?.name || 'ZamTaxi Green'} • ${matchedMock.vehicleName}`,
           };
         }
 
@@ -778,20 +779,7 @@ export default function App() {
       {/* GLOBAL HIGH-CONTRAST HEADER */}
       <header className="bg-[#FAF7F2] border-b border-[#E5DFD3] px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="bg-white p-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-md border border-[#E5DFD3]">
-            <img 
-              src={zamfaraLogo} 
-              alt="Zamfara logo" 
-              className="w-7 h-7 object-contain" 
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div>
-            <h1 className="text-zinc-900 font-extrabold text-base leading-none">ZamTaxi Console</h1>
-            <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest mt-1">
-              Official Zamfara State Taxi Service
-            </p>
-          </div>
+          <ZamTaxiLogo size="md" showSubtext={true} />
         </div>
 
         {/* Core Tab Switch Control */}

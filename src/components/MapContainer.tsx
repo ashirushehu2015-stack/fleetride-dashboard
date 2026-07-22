@@ -114,7 +114,7 @@ function GoogleMapWrapper({
 
         {/* Roaming Cars */}
         {!trip && !isDriverMode && roamingCars.map((car) => (
-          <AdvancedMarker key={car.id} position={{ lat: car.lat, lng: car.lng }} title="Uber Driver">
+          <AdvancedMarker key={car.id} position={{ lat: car.lat, lng: car.lng }} title="ZamTaxi Driver">
             <div className="bg-white border border-zinc-300 text-zinc-900 p-1.5 rounded-full shadow-md flex items-center justify-center opacity-85">
               <Car size={12} className="fill-zinc-800" />
             </div>
