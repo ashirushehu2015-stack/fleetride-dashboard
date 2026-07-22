@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Location, VehicleConfig, Trip, ChatMessage } from '../types';
+import { Location, VehicleConfig, Trip, ChatMessage, UserProfile } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import {
   MapPin,
@@ -20,7 +20,19 @@ import {
   Send,
   Check,
   RotateCcw,
-  Clock
+  Clock,
+  Wallet,
+  Building2,
+  Smartphone,
+  Ticket,
+  Copy,
+  Plus,
+  History,
+  ArrowDownRight,
+  ArrowUpRight,
+  ArrowLeftRight,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 interface RiderPanelProps {
@@ -44,6 +56,11 @@ interface RiderPanelProps {
   isSurgeActive?: boolean;
   travelMode: 'municipal' | 'interstate';
   setTravelMode: (mode: 'municipal' | 'interstate') => void;
+  profile?: UserProfile;
+  setProfile?: React.Dispatch<React.SetStateAction<UserProfile>>;
+  passengers?: any[];
+  setPassengers?: React.Dispatch<React.SetStateAction<any[]>>;
+  addAuditLog?: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
 }
 
 export default function RiderPanel({
@@ -63,6 +80,11 @@ export default function RiderPanel({
   isSurgeActive = false,
   travelMode,
   setTravelMode,
+  profile,
+  setProfile,
+  passengers,
+  setPassengers,
+  addAuditLog,
 }: RiderPanelProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<string>('X');
   const [distance, setDistance] = useState<number>(0);
@@ -72,6 +94,69 @@ export default function RiderPanel({
   const [chatInput, setChatInput] = useState<string>('');
   const [showChat, setShowChat] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Passenger Navigation & Wallet Sub-states
+  const [activeRiderSubTab, setActiveRiderSubTab] = useState<'booking' | 'wallet'>('booking');
+  const [walletSubSection, setWalletSubSection] = useState<'deposit' | 'transfer' | 'history'>('deposit');
+  
+  // Deposit State
+  const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'card' | 'ussd' | 'voucher'>('bank_transfer');
+  const [depositAmount, setDepositAmount] = useState<string>('5000');
+  const [copiedVirtualAcc, setCopiedVirtualAcc] = useState<boolean>(false);
+  const [copiedUSSD, setCopiedUSSD] = useState<boolean>(false);
+  const [cardNo, setCardNo] = useState<string>('4111 2222 3333 4444');
+  const [cardExpiry, setCardExpiry] = useState<string>('08/28');
+  const [cardCvv, setCardCvv] = useState<string>('892');
+  const [voucherCode, setVoucherCode] = useState<string>('');
+  const [depositStatusMsg, setDepositStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Transfer Fare State
+  const [transferRecipientPhone, setTransferRecipientPhone] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState<string>('2500');
+  const [transferNote, setTransferNote] = useState<string>('');
+  const [transferStatusMsg, setTransferStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Wallet Transaction History
+  const [transactions, setTransactions] = useState<any[]>(() => {
+    const saved = localStorage.getItem('zamfara_rider_txs');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'tx-101',
+        type: 'deposit',
+        title: 'Bank Transfer Deposit',
+        amount: 25000.00,
+        timestamp: 'Today, 09:15 AM',
+        status: 'COMPLETED',
+        reference: 'ZMF-DEP-948201',
+        method: 'FirstBank Transfer'
+      },
+      {
+        id: 'tx-102',
+        type: 'fare_payment',
+        title: 'ZamTaxi Green - Gusau Municipal Ride',
+        amount: -3450.00,
+        timestamp: 'Yesterday, 04:30 PM',
+        status: 'COMPLETED',
+        reference: 'ZMF-TRIP-731092',
+        method: 'Wallet Auto-Deduct'
+      },
+      {
+        id: 'tx-103',
+        type: 'deposit',
+        title: 'Welcome Promo Voucher (ZAMFARA2026)',
+        amount: 5000.00,
+        timestamp: 'Jul 20, 2026',
+        status: 'COMPLETED',
+        reference: 'ZMF-PROMO-109283',
+        method: 'Admin Voucher'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_rider_txs', JSON.stringify(transactions));
+  }, [transactions]);
 
   const [selectedOriginCityId, setSelectedOriginCityId] = useState<string>(city.id);
   const [selectedDestCityId, setSelectedDestCityId] = useState<string>(
@@ -100,6 +185,140 @@ export default function RiderPanel({
         setSelectedDestCityId(otherCity.id);
       }
     }
+  };
+
+  // Deposit Action Logic
+  const handleDepositSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setDepositStatusMsg(null);
+    const amt = parseFloat(depositAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setDepositStatusMsg({ type: 'error', text: 'Please enter a valid deposit amount greater than ₦0.' });
+      return;
+    }
+
+    let methodLabel = 'Bank Transfer';
+    if (depositMethod === 'card') methodLabel = 'Debit Card';
+    if (depositMethod === 'ussd') methodLabel = 'USSD Deposit';
+    if (depositMethod === 'voucher') {
+      const code = voucherCode.trim().toUpperCase();
+      if (!code) {
+        setDepositStatusMsg({ type: 'error', text: 'Please enter a valid voucher code.' });
+        return;
+      }
+      if (code !== 'ZAMFARA2026' && code !== 'GUSAUFREE' && code !== 'FREEFARE') {
+        setDepositStatusMsg({ type: 'error', text: 'Invalid or expired voucher code. Try ZAMFARA2026 or GUSAUFREE.' });
+        return;
+      }
+      methodLabel = `Voucher (${code})`;
+    }
+
+    const currentBal = profile?.balance ?? 50000;
+    const newBalance = parseFloat((currentBal + amt).toFixed(2));
+
+    // Update profile balance
+    if (setProfile) {
+      setProfile((prev) => ({
+        ...prev,
+        balance: newBalance
+      }));
+    }
+
+    // Sync matching passenger in passengers array
+    if (setPassengers && profile) {
+      setPassengers((prevList) =>
+        prevList.map((p) => (p.name === profile.name ? { ...p, balance: newBalance } : p))
+      );
+    }
+
+    // Add transaction record
+    const newTx = {
+      id: 'tx-' + Math.random().toString(36).substr(2, 8),
+      type: 'deposit',
+      title: `Deposit via ${methodLabel}`,
+      amount: amt,
+      timestamp: 'Just now',
+      status: 'COMPLETED',
+      reference: 'ZMF-DEP-' + Math.floor(100000 + Math.random() * 900000),
+      method: methodLabel
+    };
+
+    setTransactions((prev) => [newTx, ...prev]);
+
+    if (addAuditLog && profile) {
+      addAuditLog('RIDER', `Passenger ${profile.name} deposited ₦${amt.toLocaleString()} via ${methodLabel}. New balance: ₦${newBalance.toLocaleString()}`);
+    }
+
+    setDepositStatusMsg({
+      type: 'success',
+      text: `Successfully deposited ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} into your wallet! New balance: ₦${newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+    });
+  };
+
+  // Transfer Fare Action Logic
+  const handleTransferSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTransferStatusMsg(null);
+    const amt = parseFloat(transferAmount);
+    const currentBal = profile?.balance ?? 50000;
+
+    if (isNaN(amt) || amt <= 0) {
+      setTransferStatusMsg({ type: 'error', text: 'Please enter a valid transfer amount.' });
+      return;
+    }
+
+    if (amt > currentBal) {
+      setTransferStatusMsg({ type: 'error', text: `Insufficient wallet balance. You have ₦${currentBal.toLocaleString()}, but tried to send ₦${amt.toLocaleString()}.` });
+      return;
+    }
+
+    const recipientName = transferRecipientPhone || 'Bello Matawalle (+234 806 444 5566)';
+    const newBalance = parseFloat((currentBal - amt).toFixed(2));
+
+    // Update profile balance
+    if (setProfile) {
+      setProfile((prev) => ({
+        ...prev,
+        balance: newBalance
+      }));
+    }
+
+    // Update passenger list
+    if (setPassengers && profile) {
+      setPassengers((prevList) =>
+        prevList.map((p) => {
+          if (p.name === profile.name) return { ...p, balance: newBalance };
+          if (transferRecipientPhone && (p.phone === transferRecipientPhone || p.id === transferRecipientPhone || p.email === transferRecipientPhone)) {
+            return { ...p, balance: parseFloat((p.balance + amt).toFixed(2)) };
+          }
+          return p;
+        })
+      );
+    }
+
+    // Add transaction
+    const newTx = {
+      id: 'tx-' + Math.random().toString(36).substr(2, 8),
+      type: 'transfer_out',
+      title: `Fare Transfer to ${recipientName}`,
+      amount: -amt,
+      timestamp: 'Just now',
+      status: 'COMPLETED',
+      reference: 'ZMF-TRF-' + Math.floor(100000 + Math.random() * 900000),
+      method: 'Wallet Transfer'
+    };
+
+    setTransactions((prev) => [newTx, ...prev]);
+
+    if (addAuditLog && profile) {
+      addAuditLog('RIDER', `Passenger ${profile.name} transferred fare ₦${amt.toLocaleString()} to ${recipientName}. Note: ${transferNote || 'N/A'}`);
+    }
+
+    setTransferStatusMsg({
+      type: 'success',
+      text: `Transfer successful! ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} sent to ${recipientName}.`
+    });
+    setTransferNote('');
   };
 
   // Auto scroll chat to bottom
@@ -137,7 +356,6 @@ export default function RiderPanel({
       }
       setDistance(calculatedDistance);
 
-      // ETA calculation: municipal is 1.5 min/km + 2, interstate is average of 85km/h (approx 0.7 mins per km)
       const calculatedDuration =
         travelMode === 'municipal'
           ? Math.round(calculatedDistance * 1.5 + 2)
@@ -169,17 +387,15 @@ export default function RiderPanel({
   const getPrice = (multiplier: number) => {
     if (distance === 0) return 0;
     if (travelMode === 'municipal') {
-      // Flat rate ₦1350 base + ₦540 per km, scaled by multiplier
       let rawPrice = (4.5 + distance * 1.8) * multiplier * 300;
       if (isSurgeActive) {
         rawPrice *= 1.8;
       }
       return parseFloat(rawPrice.toFixed(2));
     } else {
-      // Out of State rate: ₦12,000 base + ₦180 per km, scaled by multiplier
       let rawPrice = (12000 + distance * 180) * multiplier;
       if (isSurgeActive) {
-        rawPrice *= 1.5; // interstate surge multiplier is gentler
+        rawPrice *= 1.5;
       }
       return parseFloat(rawPrice.toFixed(2));
     }
@@ -199,14 +415,12 @@ export default function RiderPanel({
     setChatInput('');
   };
 
-  // Helper to swap locations
   const handleSwapLocations = () => {
     const temp = origin;
     setOrigin(destination);
     setDestination(temp);
   };
 
-  // Clear locations
   const handleClear = () => {
     setOrigin(null);
     setDestination(null);
@@ -214,31 +428,68 @@ export default function RiderPanel({
 
   return (
     <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-[#E5DFD3] max-h-[85vh] lg:max-h-[90vh]">
-      {/* 1. HEADER & CITY PICKER */}
-      <div className="p-4 bg-[#FAF7F2] text-zinc-900 flex items-center justify-between border-b border-[#E5DFD3]">
-        <div className="flex items-center gap-2">
-          <div className="bg-emerald-700 text-white px-2 py-1 rounded-lg font-black tracking-tight text-xs uppercase shadow-xs">
-            ZamTaxi
+      {/* 1. HEADER & SUB-NAVIGATION TABS */}
+      <div className="p-4 bg-[#FAF7F2] text-zinc-900 space-y-3 border-b border-[#E5DFD3]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-700 text-white px-2 py-1 rounded-lg font-black tracking-tight text-xs uppercase shadow-xs">
+              ZamTaxi
+            </div>
+            <span className="font-bold text-zinc-900">Passenger Portal</span>
           </div>
-          <span className="font-bold text-zinc-900">Passenger Portal</span>
+
+          {/* City Switcher */}
+          {!trip && activeRiderSubTab === 'booking' && (
+            <div className="relative">
+              <select
+                value={city.id}
+                onChange={(e) => onCityChange(e.target.value)}
+                className="bg-white hover:bg-[#F2EDE4] text-zinc-900 text-xs py-1.5 px-3 rounded-lg border border-[#E5DFD3] outline-none appearance-none pr-8 cursor-pointer font-bold shadow-xs"
+                id="rider-city-picker"
+              >
+                {cities.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-zinc-500 pointer-events-none" />
+            </div>
+          )}
         </div>
 
-        {/* City Switcher */}
+        {/* SubTab Toggle Bar */}
         {!trip && (
-          <div className="relative">
-            <select
-              value={city.id}
-              onChange={(e) => onCityChange(e.target.value)}
-              className="bg-white hover:bg-[#F2EDE4] text-zinc-900 text-xs py-1.5 px-3 rounded-lg border border-[#E5DFD3] outline-none appearance-none pr-8 cursor-pointer font-bold shadow-xs"
-              id="rider-city-picker"
+          <div className="flex bg-[#E5DFD3]/60 p-1 rounded-xl gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveRiderSubTab('booking')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeRiderSubTab === 'booking'
+                  ? 'bg-zinc-900 text-white shadow-sm'
+                  : 'text-zinc-700 hover:text-zinc-950 hover:bg-white/50'
+              }`}
+              id="rider-tab-book-ride"
             >
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-2.5 text-zinc-500 pointer-events-none" />
+              <Car size={14} />
+              Book Ride
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveRiderSubTab('wallet')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeRiderSubTab === 'wallet'
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'text-zinc-700 hover:text-zinc-950 hover:bg-white/50'
+              }`}
+              id="rider-tab-passenger-wallet"
+            >
+              <Wallet size={14} />
+              Passenger Wallet
+              <span className="bg-emerald-100 text-emerald-950 px-2 py-0.5 rounded-full text-[10px] font-mono font-black ml-1">
+                ₦{(profile?.balance ?? 50000).toLocaleString()}
+              </span>
+            </button>
           </div>
         )}
       </div>
@@ -247,7 +498,7 @@ export default function RiderPanel({
         {/* ==========================================
             STATE A: IDLE & BOOKING SEARCH FORM
            ========================================== */}
-        {!trip && (
+        {!trip && activeRiderSubTab === 'booking' && (
           <>
             {/* Travel Class Toggle */}
             <div className="flex border border-[#E5DFD3] p-1 rounded-xl bg-[#F2EDE4]">
@@ -547,7 +798,7 @@ export default function RiderPanel({
                   </div>
                 )}
                 <h4 className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">Available Options</h4>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                   {VEHICLE_CONFIGS.map((v) => {
                     const price = getPrice(v.multiplier);
                     const isSelected = selectedVehicle === v.id;
@@ -612,12 +863,36 @@ export default function RiderPanel({
             {/* Payment & Book CTA */}
             {origin && destination && (
               <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between px-1.5 text-xs text-zinc-600">
-                  <div className="flex items-center gap-1.5">
-                    <CreditCard size={14} className="text-zinc-500" />
-                    <span className="font-bold">Personal Visa (•••• 4321)</span>
+                <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-zinc-800">
+                      <Wallet size={15} className="text-emerald-700" />
+                      <span>ZamTaxi Fare Wallet:</span>
+                    </div>
+                    <span className="font-black text-emerald-800 text-sm">
+                      ₦{(profile?.balance ?? 50000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
-                  <span className="font-bold text-emerald-700">Promo Applied</span>
+                  {(profile?.balance ?? 50000) < getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1) ? (
+                    <div className="flex items-center justify-between text-xs bg-amber-50 p-2 rounded-lg border border-amber-200 text-amber-900 font-bold">
+                      <span>⚠️ Low wallet balance for this ride</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveRiderSubTab('wallet');
+                          setWalletSubSection('deposit');
+                        }}
+                        className="text-[10px] bg-emerald-700 text-white px-2.5 py-1 rounded-md font-extrabold cursor-pointer hover:bg-emerald-800"
+                      >
+                        Top Up Wallet
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-emerald-800 font-bold flex items-center justify-between">
+                      <span>✓ Auto-deducted from Passenger Wallet</span>
+                      <span className="text-zinc-600 font-normal">Promo Active</span>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -631,6 +906,514 @@ export default function RiderPanel({
               </div>
             )}
           </>
+        )}
+
+        {/* ==========================================
+            STATE A2: PASSENGER WALLET & DEPOSITS VIEW
+           ========================================== */}
+        {!trip && activeRiderSubTab === 'wallet' && (
+          <div className="space-y-4 py-1">
+            {/* WALLET HERO CARD */}
+            <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 text-white p-5 rounded-2xl border border-emerald-500/30 shadow-xl space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono font-extrabold text-emerald-400 uppercase tracking-widest block">
+                      Passenger Wallet ID
+                    </span>
+                    <span className="text-xs font-bold text-zinc-200">
+                      {profile?.name || 'Ashiru Shehu'} (ZMF-3098172654)
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-1 rounded-full border border-emerald-500/30 uppercase tracking-wider">
+                  Verified
+                </span>
+              </div>
+
+              <div className="pt-2 pb-1 border-t border-zinc-800">
+                <span className="text-[10px] font-mono uppercase font-bold text-zinc-400 tracking-wider">Available Fare Balance</span>
+                <div className="text-3xl font-black text-white mt-0.5 flex items-baseline gap-1">
+                  <span className="text-emerald-400 font-sans">₦</span>
+                  {(profile?.balance ?? 50000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              {/* Quick Sub-navigation */}
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/80">
+                <button
+                  type="button"
+                  onClick={() => setWalletSubSection('deposit')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    walletSubSection === 'deposit'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
+                  }`}
+                  id="wallet-sub-deposit"
+                >
+                  <Plus size={14} />
+                  Deposit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletSubSection('transfer')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    walletSubSection === 'transfer'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
+                  }`}
+                  id="wallet-sub-transfer"
+                >
+                  <ArrowLeftRight size={14} />
+                  Transfer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletSubSection('history')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    walletSubSection === 'history'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
+                  }`}
+                  id="wallet-sub-history"
+                >
+                  <History size={14} />
+                  History
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION 1: DEPOSIT FARE FUNDS */}
+            {walletSubSection === 'deposit' && (
+              <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-4">
+                <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider flex items-center gap-2">
+                    <Plus size={15} className="text-emerald-700" />
+                    Deposit Transfer Fare
+                  </h4>
+                  <span className="text-[10px] font-bold text-zinc-600">Instant Wallet Top-up</span>
+                </div>
+
+                {depositStatusMsg && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-bold flex items-start gap-2 shadow-xs ${
+                      depositStatusMsg.type === 'success'
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                        : 'bg-rose-100 text-rose-900 border border-rose-300'
+                    }`}
+                  >
+                    {depositStatusMsg.type === 'success' ? (
+                      <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />
+                    )}
+                    <span>{depositStatusMsg.text}</span>
+                  </div>
+                )}
+
+                {/* Deposit Method Selectors */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDepositMethod('bank_transfer')}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between h-18 ${
+                      depositMethod === 'bank_transfer'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                        : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                    }`}
+                  >
+                    <Building2 size={16} className={depositMethod === 'bank_transfer' ? 'text-emerald-400' : 'text-zinc-600'} />
+                    <div>
+                      <span className="block text-xs font-black">Bank Transfer</span>
+                      <span className="text-[9px] opacity-75 font-semibold">Virtual Account</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDepositMethod('card')}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between h-18 ${
+                      depositMethod === 'card'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                        : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                    }`}
+                  >
+                    <CreditCard size={16} className={depositMethod === 'card' ? 'text-emerald-400' : 'text-zinc-600'} />
+                    <div>
+                      <span className="block text-xs font-black">Debit/Credit Card</span>
+                      <span className="text-[9px] opacity-75 font-semibold">Instant Pay</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDepositMethod('ussd')}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between h-18 ${
+                      depositMethod === 'ussd'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                        : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                    }`}
+                  >
+                    <Smartphone size={16} className={depositMethod === 'ussd' ? 'text-emerald-400' : 'text-zinc-600'} />
+                    <div>
+                      <span className="block text-xs font-black">USSD Code</span>
+                      <span className="text-[9px] opacity-75 font-semibold">*894# Bank Code</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDepositMethod('voucher')}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between h-18 ${
+                      depositMethod === 'voucher'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+                        : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                    }`}
+                  >
+                    <Ticket size={16} className={depositMethod === 'voucher' ? 'text-emerald-400' : 'text-zinc-600'} />
+                    <div>
+                      <span className="block text-xs font-black">Promo Voucher</span>
+                      <span className="text-[9px] opacity-75 font-semibold">Bonus Deposit</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* BANK TRANSFER DEPOSIT FORM */}
+                {depositMethod === 'bank_transfer' && (
+                  <div className="space-y-4 pt-1">
+                    <div className="bg-white p-3.5 rounded-xl border border-[#E5DFD3] space-y-2.5">
+                      <div className="flex items-center justify-between text-xs border-b border-zinc-100 pb-2">
+                        <span className="text-zinc-600 font-bold">Bank Name:</span>
+                        <span className="font-black text-zinc-900">FirstBank Nigeria / Zenith Bank</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs border-b border-zinc-100 pb-2">
+                        <span className="text-zinc-600 font-bold">Account Name:</span>
+                        <span className="font-black text-zinc-900">ZamTaxi Passenger Wallet - {profile?.name || 'Ashiru Shehu'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-600 font-bold">Virtual Account No:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-emerald-800 text-sm tracking-wider">3098172654</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText('3098172654');
+                              setCopiedVirtualAcc(true);
+                              setTimeout(() => setCopiedVirtualAcc(false), 2500);
+                            }}
+                            className="p-1 text-zinc-500 hover:text-zinc-900 cursor-pointer"
+                            title="Copy Account Number"
+                          >
+                            {copiedVirtualAcc ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Deposit Preset Chips */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                        Quick Preset Deposit Amount
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {['2000', '5000', '10000', '20000', '50000'].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setDepositAmount(amt)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer border ${
+                              depositAmount === amt
+                                ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                                : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                            }`}
+                          >
+                            ₦{parseInt(amt).toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Amount Input */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                        Custom Deposit Amount (₦)
+                      </label>
+                      <input
+                        type="number"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        placeholder="e.g. 15000"
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2.5 text-sm font-black text-zinc-900 outline-none focus:border-zinc-900"
+                        id="custom-deposit-amount-input"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDepositSubmit()}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      id="confirm-bank-deposit-btn"
+                    >
+                      <CheckCircle2 size={16} />
+                      Complete Bank Deposit (Credit ₦{parseFloat(depositAmount || '0').toLocaleString()})
+                    </button>
+                  </div>
+                )}
+
+                {/* CARD DEPOSIT FORM */}
+                {depositMethod === 'card' && (
+                  <form onSubmit={handleDepositSubmit} className="space-y-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Card Number</label>
+                      <input
+                        type="text"
+                        value={cardNo}
+                        onChange={(e) => setCardNo(e.target.value)}
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Expiry</label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">CVV</label>
+                        <input
+                          type="password"
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Deposit Amount (₦)</label>
+                      <input
+                        type="number"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-black text-zinc-900 outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-black py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      id="confirm-card-deposit-btn"
+                    >
+                      <CreditCard size={15} />
+                      Pay ₦{parseFloat(depositAmount || '0').toLocaleString()} via Debit Card
+                    </button>
+                  </form>
+                )}
+
+                {/* USSD DEPOSIT */}
+                {depositMethod === 'ussd' && (
+                  <div className="space-y-4 pt-1">
+                    <div className="bg-white p-4 rounded-xl border border-[#E5DFD3] text-center space-y-2">
+                      <span className="text-xs font-bold text-zinc-600 block">Dial USSD string on your mobile phone:</span>
+                      <div className="p-3 bg-zinc-950 text-emerald-400 font-mono font-extrabold text-base rounded-xl tracking-wider flex items-center justify-center gap-3">
+                        <span>*894*{depositAmount || '5000'}*3098172654#</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(`*894*${depositAmount || '5000'}*3098172654#`);
+                            setCopiedUSSD(true);
+                            setTimeout(() => setCopiedUSSD(false), 2500);
+                          }}
+                          className="text-white hover:text-emerald-300 p-1 cursor-pointer"
+                        >
+                          {copiedUSSD ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-medium">Supported by FirstBank, GTBank, Zenith, UBA, & Access Bank.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDepositSubmit()}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      id="confirm-ussd-deposit-btn"
+                    >
+                      Confirm USSD Deposit Completed
+                    </button>
+                  </div>
+                )}
+
+                {/* PROMO VOUCHER DEPOSIT */}
+                {depositMethod === 'voucher' && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Voucher / Promo Code</label>
+                      <input
+                        type="text"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value)}
+                        placeholder="e.g. ZAMFARA2026 or GUSAUFREE"
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2.5 text-xs font-mono font-extrabold uppercase text-zinc-900 outline-none"
+                        id="voucher-code-input"
+                      />
+                    </div>
+                    <p className="text-[10px] text-emerald-800 font-bold bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                      💡 Tip: Try code <span className="font-mono underline">ZAMFARA2026</span> (+₦5,000) or <span className="font-mono underline">GUSAUFREE</span> (+₦10,000).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDepositAmount(voucherCode.toUpperCase() === 'GUSAUFREE' ? '10000' : '5000');
+                        handleDepositSubmit();
+                      }}
+                      className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-black py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      id="redeem-voucher-btn"
+                    >
+                      <Ticket size={15} />
+                      Redeem Voucher
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SECTION 2: TRANSFER FARE */}
+            {walletSubSection === 'transfer' && (
+              <form onSubmit={handleTransferSubmit} className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-4">
+                <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider flex items-center gap-2">
+                    <ArrowLeftRight size={15} className="text-emerald-700" />
+                    Transfer Fare to Passenger or Driver
+                  </h4>
+                  <span className="text-[10px] font-bold text-zinc-600">Zero Commission Fee</span>
+                </div>
+
+                {transferStatusMsg && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-bold flex items-start gap-2 shadow-xs ${
+                      transferStatusMsg.type === 'success'
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                        : 'bg-rose-100 text-rose-900 border border-rose-300'
+                    }`}
+                  >
+                    {transferStatusMsg.type === 'success' ? (
+                      <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />
+                    )}
+                    <span>{transferStatusMsg.text}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                    Select Recipient
+                  </label>
+                  <select
+                    value={transferRecipientPhone}
+                    onChange={(e) => setTransferRecipientPhone(e.target.value)}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-zinc-900 outline-none cursor-pointer"
+                    id="transfer-recipient-select"
+                  >
+                    <option value="">Bello Matawalle (+234 806 444 5566)</option>
+                    <option value="diana@transit.ng">Diana Prince (+234 813 999 8888)</option>
+                    <option value="driver-1">Michael Scott (ZamTaxi EV Driver)</option>
+                    {passengers && passengers.filter(p => p.name !== profile?.name).map(p => (
+                      <option key={p.id} value={p.phone || p.id}>
+                        {p.name} ({p.phone || p.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                    Transfer Amount (₦)
+                  </label>
+                  <input
+                    type="number"
+                    value={transferAmount}
+                    onChange={(e) => setTransferAmount(e.target.value)}
+                    placeholder="e.g. 2500"
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-sm font-black text-zinc-900 outline-none"
+                    id="transfer-amount-input"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                    Narration / Note (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={transferNote}
+                    onChange={(e) => setTransferNote(e.target.value)}
+                    placeholder="e.g. Fare contribution for Abuja interstate trip"
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-medium text-zinc-900 outline-none"
+                    id="transfer-note-input"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                  id="confirm-send-transfer-btn"
+                >
+                  <Send size={15} />
+                  Confirm & Send ₦{parseFloat(transferAmount || '0').toLocaleString()}
+                </button>
+              </form>
+            )}
+
+            {/* SECTION 3: TRANSACTION HISTORY */}
+            {walletSubSection === 'history' && (
+              <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-3">
+                <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider flex items-center gap-2">
+                    <History size={15} className="text-emerald-700" />
+                    Wallet Transaction History
+                  </h4>
+                  <span className="text-[10px] font-bold text-zinc-600">{transactions.length} Records</span>
+                </div>
+
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                  {transactions.map((tx) => {
+                    const isCredit = tx.amount > 0;
+                    return (
+                      <div key={tx.id} className="bg-white p-3 rounded-xl border border-[#E5DFD3] flex items-center justify-between text-xs shadow-2xs">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${
+                            isCredit ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {isCredit ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-zinc-900 block">{tx.title}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono font-bold block">{tx.reference} • {tx.timestamp}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`font-black text-sm block ${isCredit ? 'text-emerald-700' : 'text-zinc-900'}`}>
+                            {isCredit ? '+' : ''}₦{Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[9px] uppercase font-mono font-bold bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded">
+                            {tx.status}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ==========================================

@@ -932,6 +932,11 @@ export default function App() {
                 isSurgeActive={isSurgeActive}
                 travelMode={travelMode}
                 setTravelMode={setTravelMode}
+                profile={profile}
+                setProfile={setProfile}
+                passengers={passengers}
+                setPassengers={setPassengers}
+                addAuditLog={addAuditLog}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">

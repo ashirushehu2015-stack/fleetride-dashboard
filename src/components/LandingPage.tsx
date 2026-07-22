@@ -1001,7 +1001,7 @@ export default function LandingPage({
 
               {/* Booking Trigger CTA */}
               <button
-                onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
+                onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
                 className="w-full bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-extrabold py-3.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-white/5"
               >
                 Sign In to Book This Ride Now
@@ -1036,15 +1036,15 @@ export default function LandingPage({
                 id="select-operational-sector"
                 value={selectedCityId}
                 onChange={(e) => setSelectedCityId(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white font-semibold rounded-xl px-4 py-3.5 appearance-none focus:outline-none focus:border-emerald-500 transition cursor-pointer pr-10 text-sm"
+                className="w-full bg-[#FAF7F2] border border-[#E5DFD3] hover:border-zinc-400 text-zinc-950 font-semibold rounded-xl px-4 py-3.5 appearance-none focus:outline-none focus:border-emerald-700 transition cursor-pointer pr-10 text-sm shadow-xs"
               >
                 {CITIES.map((city) => (
-                  <option key={city.id} value={city.id} className="bg-zinc-950 text-white py-2">
+                  <option key={city.id} value={city.id} className="bg-white text-zinc-950 py-2">
                     {city.name}
                   </option>
                 ))}
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-zinc-400">
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-zinc-500">
                 <ChevronDown size={18} />
               </div>
             </div>
@@ -1060,10 +1060,10 @@ export default function LandingPage({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl"
+                  className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-3xl overflow-hidden shadow-xl"
                 >
-                  {/* Top / Main Image Showcase: Full Bleed Wide Side Profile matching Bolt photo composition */}
-                  <div className="relative w-full overflow-hidden group bg-zinc-950">
+                  {/* Top / Main Image Showcase: Original Hausa Gentleman with EV Taxi on Milky Background */}
+                  <div className="relative w-full overflow-hidden group bg-[#F2EDE4]">
                     <img
                       src={zamtaxiHausaMan}
                       alt="Official ZAMTAXI Electric Car with Hausa Gentleman"
@@ -1079,12 +1079,12 @@ export default function LandingPage({
                   </div>
 
                   {/* Bottom Action Area */}
-                  <div className="p-5 sm:p-6 bg-zinc-900 text-left border-t border-zinc-800">
+                  <div className="p-5 sm:p-6 bg-[#FAF7F2] text-left border-t border-[#E5DFD3]">
                     <button 
-                      onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 uppercase tracking-wider"
+                      onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black py-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 uppercase tracking-wider"
                     >
-                      Access {city.name.split(' ')[0]} Dispatch Desk
+                      Access {city.name.split(' ')[0]} Dispatch Desk (Rider Mode)
                       <ArrowRight size={18} />
                     </button>
                   </div>
