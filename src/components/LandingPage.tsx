@@ -24,13 +24,34 @@ import {
   Lock,
   Compass,
   DollarSign,
-  ChevronDown
+  ChevronDown,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Location, VehicleType, UserProfile } from '../types';
 import { CITIES, VEHICLE_CONFIGS } from '../data';
 // @ts-ignore
-import zamfaraLogo from '../assets/images/zamfara_state_logo_official.png';
+import zamtaxiFront from '../assets/images/zamtaxi_front_1784738289926.jpg';
+// @ts-ignore
+import zamtaxiBonnet from '../assets/images/zamtaxi_bonnet_1784738306450.jpg';
+// @ts-ignore
+import zamtaxiDriving from '../assets/images/zamtaxi_driving_1784738322282.jpg';
+// @ts-ignore
+import greenEvHeroTaxi from '../assets/images/green_ev_hero_taxi_1784738815893.jpg';
+// @ts-ignore
+import zamtaxiSideProfile from '../assets/images/zamtaxi_side_profile_1784739398677.jpg';
+// @ts-ignore
+import zamtaxiBoltStyle from '../assets/images/zamtaxi_bolt_style_1784740082968.jpg';
+// @ts-ignore
+import zamtaxiGreenPainted from '../assets/images/zamtaxi_green_painted_1784740790868.jpg';
+// @ts-ignore
+import zamtaxiHausaMan from '../assets/images/zamtaxi_hausa_man_1784741007702.jpg';
+// @ts-ignore
+import zamtaxiBoldGreenFront from '../assets/images/zamtaxi_bold_green_front_1784741222972.jpg';
+// @ts-ignore
+import airportTransferPassenger from '../assets/images/airport_transfer_passenger_1784740265459.jpg';
+// @ts-ignore
+import zamtaxiAirportTransferGreen from '../assets/images/zamtaxi_airport_transfer_green_1784740477851.jpg';
 
 interface LandingPageProps {
   passengers: any[];
@@ -494,49 +515,124 @@ export default function LandingPage({
           </p>
         </div>
 
-        {/* HERO RIGHT: ZAMFARA STATE LOGO */}
+        {/* HERO RIGHT: 100% ELECTRIC ZAMTAXI VEHICLE */}
         <div className="lg:col-span-5 relative">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-zinc-800 rounded-3xl blur opacity-10" />
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-amber-500 rounded-3xl blur opacity-30" />
           
-          <div className="relative bg-zinc-900/60 backdrop-blur-sm border border-zinc-800 rounded-3xl p-8 shadow-2xl flex flex-col items-center justify-center text-center space-y-6 min-h-[420px]">
+          <div className="relative bg-zinc-900 text-white border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between">
             
-            {/* Logo frame with pulse glow */}
-            <div className="relative group">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500 to-amber-500 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000" />
-              <div className="relative bg-white p-4 rounded-2xl shadow-xl border border-zinc-800 flex items-center justify-center">
-                <img
-                  src={zamfaraLogo}
-                  alt="Zamfara State Logo"
-                  className="w-48 h-48 md:w-56 md:h-56 object-contain rounded-xl"
-                  referrerPolicy="no-referrer"
-                />
+            {/* Bold Full-Bleed ZAMTAXI Vehicle Showcase - No inner frame, edge-to-edge */}
+            <div className="relative w-full overflow-hidden group bg-zinc-950">
+              <img
+                src={zamtaxiBoldGreenFront}
+                alt="Official ZAMTAXI 100% Electric Taxi"
+                className="w-full h-auto aspect-[16/10] sm:aspect-[16/9] object-cover group-hover:scale-103 transition duration-700"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== zamtaxiFront) {
+                    target.src = zamtaxiFront;
+                  }
+                }}
+                referrerPolicy="no-referrer"
+              />
+              
+              <div className="absolute top-4 left-4 bg-emerald-600/90 backdrop-blur-md text-white text-[11px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-xl border border-emerald-400/40 z-10">
+                ZAMTAXI • 100% ELECTRIC
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold font-mono px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
-                Official State Seal
+            <div className="p-6 space-y-2 text-center bg-zinc-900 border-t border-zinc-800/80">
+              <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-extrabold font-mono px-3.5 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                Official State Transport Fleet
               </div>
-              <h3 className="text-xl font-black text-white tracking-tight">
-                ZAMFARA STATE GOVERNMENT
+              <h3 className="text-3xl font-black text-white tracking-wider">
+                ZAMTAXI
               </h3>
-              <p className="text-xs text-zinc-400 font-medium max-w-sm mx-auto leading-relaxed">
-                "Land of Farming and Solid Minerals"
+              <p className="text-xs text-zinc-300 font-medium max-w-sm mx-auto leading-relaxed">
+                Zamfara State Transport • 100% Electric • Intrastate & Interstate
               </p>
             </div>
 
-            {/* Subtle background specs/stats */}
-            <div className="w-full grid grid-cols-2 gap-4 border-t border-zinc-800/60 pt-6">
-              <div className="text-left pl-2">
-                <span className="block text-[10px] uppercase font-bold text-zinc-500 font-mono tracking-wider">State Capital</span>
-                <span className="block text-sm font-bold text-zinc-200 mt-0.5">Gusau</span>
+          </div>
+        </div>
+      </section>
+
+      {/* OFFICIAL ZAMTAXI 100% ELECTRIC FLEET SHOWCASE */}
+      <section id="fleet" className="bg-[#FAF7F2] border-y border-[#E5DFD3] py-16 px-6">
+        <div className="max-w-7xl mx-auto space-y-10">
+          <div className="text-center space-y-3 max-w-2xl mx-auto">
+            <span className="text-xs uppercase font-extrabold text-emerald-700 tracking-wider">OFFICIAL STATE FLEET</span>
+            <h3 className="text-3xl font-extrabold text-zinc-950 tracking-tight">
+              100% Electric ZamTaxi Vehicles
+            </h3>
+            <p className="text-zinc-700 font-medium text-xs leading-relaxed">
+              Deployed across Zamfara State and 17 covered state corridors. Clean energy, zero emissions, and modern passenger comfort.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Photo 1: Front view */}
+            <div className="bg-white border border-[#E5DFD3] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
+              <div className="relative h-56 overflow-hidden bg-zinc-900">
+                <img
+                  src={zamtaxiFront}
+                  alt="ZamTaxi Green Electric Car Front View"
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-3 left-3 bg-emerald-700 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                  Front View • BWR-22EM
+                </div>
               </div>
-              <div className="text-right pr-2">
-                <span className="block text-[10px] uppercase font-bold text-zinc-500 font-mono tracking-wider">Active Region</span>
-                <span className="block text-sm font-bold text-zinc-200 mt-0.5">North-West Nigeria</span>
+              <div className="p-5 space-y-2 text-left">
+                <h4 className="font-extrabold text-base text-zinc-900">Official State Taxi (Abuja & Gusau)</h4>
+                <p className="text-zinc-600 text-xs font-medium leading-relaxed">
+                  Modern green electric sedan deployed across Gusau, Talata Mafara, and Kaura Namoda. Equipped with GPS telematics and climate control.
+                </p>
               </div>
             </div>
 
+            {/* Photo 2: Bonnet branding */}
+            <div className="bg-white border border-[#E5DFD3] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
+              <div className="relative h-56 overflow-hidden bg-zinc-900">
+                <img
+                  src={zamtaxiBonnet}
+                  alt="ZamTaxi Hood Livery 100% Electric"
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-3 left-3 bg-emerald-700 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                  100% Electric Hood Wrap
+                </div>
+              </div>
+              <div className="p-5 space-y-2 text-left">
+                <h4 className="font-extrabold text-base text-zinc-900">Zamfara State Transport Livery</h4>
+                <p className="text-zinc-600 text-xs font-medium leading-relaxed">
+                  Distinctive green livery with "ZamTaxi 100% Electric" logo and checkered decal trim. Zero emissions transport for all commuters.
+                </p>
+              </div>
+            </div>
+
+            {/* Photo 3: Driving on road */}
+            <div className="bg-white border border-[#E5DFD3] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
+              <div className="relative h-56 overflow-hidden bg-zinc-900">
+                <img
+                  src={zamtaxiDriving}
+                  alt="ZamTaxi Driving in Transit"
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-3 left-3 bg-emerald-700 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                  Active Dispatch
+                </div>
+              </div>
+              <div className="p-5 space-y-2 text-left">
+                <h4 className="font-extrabold text-base text-zinc-900">Intrastate & Interstate Routes</h4>
+                <p className="text-zinc-600 text-xs font-medium leading-relaxed">
+                  In active transit connecting city terminals and highway corridors across all 17 covered state sectors with real-time driver dispatch.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -793,7 +889,7 @@ export default function LandingPage({
           </p>
         </div>
 
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto space-y-6">
           <div className="relative">
             <label className="block text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-2 text-center">
               Select Operating Network:
@@ -827,53 +923,115 @@ export default function LandingPage({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-850 hover:border-zinc-800 rounded-2xl p-6 sm:p-8 transition flex flex-col justify-between space-y-6 shadow-xl shadow-black/10"
+                  className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl"
                 >
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 text-emerald-400">
-                        <MapPin size={22} />
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold tracking-wide uppercase flex items-center gap-1.5 border border-emerald-500/10">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                        Active Sector
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="text-white font-extrabold text-xl tracking-tight">{city.name}</h4>
-                      <p className="text-zinc-500 text-xs font-mono bg-zinc-950/80 px-3 py-1.5 rounded-lg border border-zinc-850 inline-block">
-                        GPS Center: Lat <span className="text-zinc-300">{city.center.lat.toFixed(4)}</span> • Lng <span className="text-zinc-300">{city.center.lng.toFixed(4)}</span>
-                      </p>
-                    </div>
-
-                    {/* Landmarks Preview */}
-                    <div className="space-y-3">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-widest block">Key Dispatch Hubs & Landmarks:</span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {city.landmarks.map((l, i) => (
-                          <div key={i} className="flex items-center gap-2 bg-zinc-950/50 px-3 py-2 rounded-xl border border-zinc-850 text-zinc-300 hover:text-white transition">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="text-xs font-medium tracking-tight truncate">{l.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Top / Main Image Showcase: Full Bleed Wide Side Profile matching Bolt photo composition */}
+                  <div className="relative w-full overflow-hidden group bg-zinc-950">
+                    <img
+                      src={zamtaxiHausaMan}
+                      alt="Official ZAMTAXI Electric Car with Hausa Gentleman"
+                      className="w-full h-auto aspect-[16/9] sm:aspect-[2/1] md:aspect-[2.2/1] object-cover group-hover:scale-103 transition duration-700"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== zamtaxiGreenPainted) {
+                          target.src = zamtaxiGreenPainted;
+                        }
+                      }}
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
 
-                  <div className="pt-2">
+                  {/* Bottom Action Area */}
+                  <div className="p-5 sm:p-6 bg-zinc-900 text-left border-t border-zinc-800">
                     <button 
                       onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold py-3.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20"
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 uppercase tracking-wider"
                     >
                       Access {city.name.split(' ')[0]} Dispatch Desk
-                      <ArrowRight size={14} />
+                      <ArrowRight size={18} />
                     </button>
                   </div>
                 </motion.div>
               );
             })()}
           </AnimatePresence>
+        </div>
+      </section>
+
+      {/* AIRPORTS TRANSFER SHOWCASE SECTION */}
+      <section className="bg-zinc-950/80 border-t border-zinc-900 py-20 px-6 sm:px-12">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-16 items-center">
+          
+          {/* Left: Complete Size Portrait Image with Slider Controls */}
+          <div className="md:col-span-5 flex flex-col items-center">
+            <div className="w-full max-w-[380px] bg-zinc-900 p-2 rounded-[2rem] shadow-2xl border border-zinc-800/80 overflow-hidden group">
+              <div className="relative aspect-[3/4] w-full rounded-[1.6rem] overflow-hidden bg-zinc-950">
+                <img
+                  src={zamtaxiAirportTransferGreen}
+                  alt="ZAMTAXI Green Electric Airport Express Taxi"
+                  className="w-full h-full object-cover group-hover:scale-103 transition duration-700"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== airportTransferPassenger) {
+                      target.src = airportTransferPassenger;
+                    }
+                  }}
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-4 left-4 bg-black/75 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-zinc-700/60 text-[11px] font-extrabold text-white tracking-wider uppercase">
+                  Airport Express
+                </div>
+              </div>
+            </div>
+
+            {/* Slider Dots & Navigation Controls */}
+            <div className="flex items-center gap-6 mt-6">
+              <button 
+                type="button"
+                className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 hover:border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition cursor-pointer"
+                aria-label="Previous slide"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="w-2 h-2 rounded-full bg-zinc-700 hover:bg-zinc-600 cursor-pointer" />
+                <span className="w-2 h-2 rounded-full bg-zinc-700 hover:bg-zinc-600 cursor-pointer" />
+              </div>
+
+              <button 
+                type="button"
+                className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 hover:border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white transition cursor-pointer"
+                aria-label="Next slide"
+              >
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Airports Description & Action */}
+          <div className="md:col-span-7 space-y-6 text-left">
+            <div className="space-y-3">
+              <h3 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight">
+                Airports
+              </h3>
+              <p className="text-zinc-300 text-base sm:text-lg leading-relaxed max-w-xl font-normal">
+                Enjoy a seamless transfer to and from 100+ airports nationwide and internationally, including Gusau Municipal, Kano, and Abuja.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => { selectLoginRole('rider'); setAuthMode('signin'); setIsLoginOpen(true); }}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition cursor-pointer shadow-lg shadow-emerald-950/30 inline-flex items-center gap-2.5"
+              >
+                View all airport transfers
+              </button>
+            </div>
+          </div>
+
         </div>
       </section>
 
