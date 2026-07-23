@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "Driver": {
+      "title": "Driver",
+      "description": "Registered vehicle drivers in the fleet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "vehicleType": { "type": "string", "maxLength": 50 },
+        "vehicleName": { "type": "string", "maxLength": 100 },
+        "plateNumber": { "type": "string", "maxLength": 50 },
+        "avatar": { "type": "string", "maxLength": 500 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "completedTrips": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "status": { "type": "string", "maxLength": 20 },
+        "joinedDate": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "vehicleType", "plateNumber", "status"]
+    },
+    "Passenger": {
+      "title": "Passenger",
+      "description": "Registered passengers/riders",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "balance": { "type": "number" },
+        "avatar": { "type": "string", "maxLength": 500 },
+        "completedTrips": { "type": "number" },
+        "status": { "type": "string", "maxLength": 20 },
+        "joinedDate": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "status"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "Completed and active ride-hailing trips",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "vehicleType": { "type": "string", "maxLength": 50 },
+        "price": { "type": "number" },
+        "distanceKm": { "type": "number" },
+        "durationMin": { "type": "number" },
+        "status": { "type": "string", "maxLength": 50 },
+        "rating": { "type": "number" },
+        "timestamp": { "type": "number" },
+        "riderName": { "type": "string", "maxLength": 100 },
+        "driverName": { "type": "string", "maxLength": 100 },
+        "cityId": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "price", "status"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "User comments and feedback submitted via Settings panel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 100 },
+        "userRole": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 50 },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "rating": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userName", "comment", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/drivers/{driverId}": {
+      "schema": { "$ref": "#/entities/Driver" },
+      "description": "Collection of all drivers"
+    },
+    "/passengers/{passengerId}": {
+      "schema": { "$ref": "#/entities/Passenger" },
+      "description": "Collection of all passengers"
+    },
+    "/trips/{tripId}": {
+      "schema": { "$ref": "#/entities/Trip" },
+      "description": "Collection of completed trip history and active rides"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "Collection of user comments and settings feedback"
+    }
+  }
+}

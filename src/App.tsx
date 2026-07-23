@@ -12,6 +12,15 @@ import ZamTaxiLogo from './components/ZamTaxiLogo';
 import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert } from 'lucide-react';
 // @ts-ignore
 import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
+import { 
+  subscribeDrivers, 
+  subscribePassengers, 
+  subscribeTrips, 
+  saveDriverToFirestore, 
+  savePassengerToFirestore, 
+  saveTripToFirestore, 
+  seedInitialFirestoreData 
+} from './firebase';
 
 export default function App() {
   // 1. Core State Managers
@@ -20,68 +29,103 @@ export default function App() {
   const [destination, setDestination] = useState<Location | null>(null);
   const [travelMode, setTravelMode] = useState<'municipal' | 'interstate'>('municipal');
 
-  // User Management State (linked to localStorage for maximum persistence!)
+  // Initial Passengers fallback
+  const INITIAL_PASSENGERS = [
+    {
+      id: 'rider-1',
+      name: 'Ashiru Shehu',
+      rating: 4.92,
+      balance: 50000.00,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      completedTrips: 12,
+      status: 'ACTIVE',
+      joinedDate: 'Jul 1, 2026',
+      email: 'ashiru@transit.ng',
+      phone: '+234 803 111 2233'
+    },
+    {
+      id: 'rider-2',
+      name: 'Bello Matawalle',
+      rating: 4.85,
+      balance: 12500.00,
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+      completedTrips: 8,
+      status: 'ACTIVE',
+      joinedDate: 'Jun 28, 2026',
+      email: 'bello@transit.ng',
+      phone: '+234 806 444 5566'
+    },
+    {
+      id: 'rider-3',
+      name: 'Diana Prince',
+      rating: 5.0,
+      balance: 120000.00,
+      avatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&q=80&w=150',
+      completedTrips: 45,
+      status: 'ACTIVE',
+      joinedDate: 'May 15, 2026',
+      email: 'diana@transit.ng',
+      phone: '+234 813 999 8888'
+    }
+  ];
+
+  // Initial Drivers fallback
+  const INITIAL_DRIVERS = MOCK_DRIVERS.map((d, index) => ({
+    id: `driver-${index + 1}`,
+    name: d.name,
+    rating: d.rating,
+    vehicleType: (index % 3 === 2 ? 'Black' : index % 3 === 1 ? 'Comfort' : 'X'),
+    vehicleName: d.vehicleName,
+    plateNumber: d.plateNumber,
+    avatar: d.avatar,
+    phone: d.phone,
+    completedTrips: d.completedTrips,
+    isVerified: true,
+    status: 'ACTIVE',
+    joinedDate: 'May 1, 2026'
+  }));
+
+  // User Management State with Firestore Integration
   const [passengers, setPassengers] = useState<any[]>(() => {
     const saved = localStorage.getItem('zamfara_passengers');
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'rider-1',
-        name: 'Ashiru Shehu',
-        rating: 4.92,
-        balance: 50000.00,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-        completedTrips: 12,
-        status: 'ACTIVE',
-        joinedDate: 'Jul 1, 2026',
-        email: 'ashiru@transit.ng',
-        phone: '+234 803 111 2233'
-      },
-      {
-        id: 'rider-2',
-        name: 'Bello Matawalle',
-        rating: 4.85,
-        balance: 12500.00,
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-        completedTrips: 8,
-        status: 'ACTIVE',
-        joinedDate: 'Jun 28, 2026',
-        email: 'bello@transit.ng',
-        phone: '+234 806 444 5566'
-      },
-      {
-        id: 'rider-3',
-        name: 'Diana Prince',
-        rating: 5.0,
-        balance: 120000.00,
-        avatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&q=80&w=150',
-        completedTrips: 45,
-        status: 'ACTIVE',
-        joinedDate: 'May 15, 2026',
-        email: 'diana@transit.ng',
-        phone: '+234 813 999 8888'
-      }
-    ];
+    return INITIAL_PASSENGERS;
   });
 
   const [drivers, setDrivers] = useState<any[]>(() => {
     const saved = localStorage.getItem('zamfara_drivers');
     if (saved) return JSON.parse(saved);
-    return MOCK_DRIVERS.map((d, index) => ({
-      id: `driver-${index + 1}`,
-      name: d.name,
-      rating: d.rating,
-      vehicleType: (index % 3 === 2 ? 'Black' : index % 3 === 1 ? 'Comfort' : 'X'),
-      vehicleName: d.vehicleName,
-      plateNumber: d.plateNumber,
-      avatar: d.avatar,
-      phone: d.phone,
-      completedTrips: d.completedTrips,
-      isVerified: true,
-      status: 'ACTIVE',
-      joinedDate: 'May 1, 2026'
-    }));
+    return INITIAL_DRIVERS;
   });
+
+  // Seed Firestore on startup and subscribe to real-time changes
+  useEffect(() => {
+    seedInitialFirestoreData(INITIAL_DRIVERS, INITIAL_PASSENGERS);
+
+    const unsubDrivers = subscribeDrivers((remoteDrivers) => {
+      if (remoteDrivers.length > 0) {
+        setDrivers(remoteDrivers);
+      }
+    });
+
+    const unsubPassengers = subscribePassengers((remotePassengers) => {
+      if (remotePassengers.length > 0) {
+        setPassengers(remotePassengers);
+      }
+    });
+
+    const unsubTrips = subscribeTrips((remoteTrips) => {
+      if (remoteTrips.length > 0) {
+        setCompletedTrips(remoteTrips);
+      }
+    });
+
+    return () => {
+      unsubDrivers();
+      unsubPassengers();
+      unsubTrips();
+    };
+  }, []);
 
   const [admins, setAdmins] = useState<any[]>(() => {
     const saved = localStorage.getItem('zamfara_admins');
@@ -116,13 +160,13 @@ export default function App() {
         id: 'log-1',
         timestamp: new Date(Date.now() - 3600000).toLocaleTimeString(),
         category: 'SYSTEM',
-        message: 'Nigeria operations engine initialized successfully.'
+        message: 'Nigeria operations engine initialized successfully with Firebase database persistence.'
       },
       {
         id: 'log-2',
         timestamp: new Date(Date.now() - 1800000).toLocaleTimeString(),
         category: 'SYSTEM',
-        message: 'Federal GPS tracking nodes calibrated across all metropolitan sectors.'
+        message: 'Federal GPS tracking nodes & Firestore data channels connected.'
       }
     ];
   });
@@ -137,13 +181,15 @@ export default function App() {
     setAuditLogs((prev) => [newLog, ...prev.slice(0, 49)]);
   };
 
-  // Sync state changes to local storage
+  // Sync state changes to local storage & Firestore
   useEffect(() => {
     localStorage.setItem('zamfara_passengers', JSON.stringify(passengers));
+    passengers.forEach((p) => savePassengerToFirestore(p));
   }, [passengers]);
 
   useEffect(() => {
     localStorage.setItem('zamfara_drivers', JSON.stringify(drivers));
+    drivers.forEach((d) => saveDriverToFirestore(d));
   }, [drivers]);
 
   useEffect(() => {
@@ -655,6 +701,7 @@ export default function App() {
               review: 'Great ride!',
             };
             setCompletedTrips((current) => [...current, completedTrip]);
+            saveTripToFirestore(completedTrip);
             return completedTrip;
           });
         } else {
@@ -719,18 +766,23 @@ export default function App() {
 
       setCompletedTrips((current) => {
         const index = current.findIndex(t => t.id === trip.id);
+        let finalTrip: Trip;
+        let updated: Trip[];
         if (index !== -1) {
-          const updated = [...current];
-          updated[index] = {
+          updated = [...current];
+          finalTrip = {
             ...updated[index],
             rating,
             review: reviewText,
             tip: tipAmount
           };
-          return updated;
+          updated[index] = finalTrip;
         } else {
-          return [...current, { ...trip, rating, review: reviewText, tip: tipAmount, status: 'COMPLETED' as const }];
+          finalTrip = { ...trip, rating, review: reviewText, tip: tipAmount, status: 'COMPLETED' as const };
+          updated = [...current, finalTrip];
         }
+        saveTripToFirestore(finalTrip);
+        return updated;
       });
     }
     setTrip(null);
@@ -805,6 +857,7 @@ export default function App() {
 
   const handleTriggerRandomTrip = (mockTrip: Trip) => {
     setCompletedTrips((prev) => [...prev, mockTrip]);
+    saveTripToFirestore(mockTrip);
     // Set the simulated completed trip as the active map view so we see its endpoints!
     setTrip(mockTrip);
   };
@@ -1033,6 +1086,7 @@ export default function App() {
             <SettingsPanel
               profile={profile}
               setProfile={setProfile}
+              addAuditLog={addAuditLog}
               onClearHistory={() => {
                 setOrigin(null);
                 setDestination(null);

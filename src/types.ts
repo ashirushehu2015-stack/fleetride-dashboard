@@ -89,4 +89,16 @@ export interface UserProfile {
   isDriver: boolean;
   avatar: string;
   role: 'rider' | 'driver' | 'admin';
+  id?: string;
+}
+
+export interface UserFeedback {
+  id: string;
+  userId?: string;
+  userName: string;
+  userRole: string;
+  category?: string;
+  comment: string;
+  rating?: number;
+  timestamp: number;
 }

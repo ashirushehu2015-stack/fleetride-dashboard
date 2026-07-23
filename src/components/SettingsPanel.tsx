@@ -11,13 +11,18 @@ import {
   BadgePercent,
   CheckCircle,
   HelpCircle,
-  Trash2
+  Trash2,
+  MessageSquare,
+  Send,
+  Star
 } from 'lucide-react';
+import { saveFeedbackToFirestore } from '../firebase';
 
 interface SettingsPanelProps {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
   onClearHistory?: () => void;
+  addAuditLog?: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
 }
 
 const GOOGLE_MAPS_KEY =
@@ -27,10 +32,22 @@ const GOOGLE_MAPS_KEY =
 
 const hasValidKey = Boolean(GOOGLE_MAPS_KEY) && GOOGLE_MAPS_KEY !== 'YOUR_API_KEY';
 
-export default function SettingsPanel({ profile, setProfile, onClearHistory }: SettingsPanelProps) {
+export default function SettingsPanel({
+  profile,
+  setProfile,
+  onClearHistory,
+  addAuditLog
+}: SettingsPanelProps) {
   const [promoCode, setPromoCode] = useState<string>('');
   const [promoApplied, setPromoApplied] = useState<boolean>(false);
   const [promoError, setPromoError] = useState<string>('');
+
+  // Feedback State
+  const [feedbackText, setFeedbackText] = useState<string>('');
+  const [feedbackCategory, setFeedbackCategory] = useState<string>('General');
+  const [feedbackRating, setFeedbackRating] = useState<number>(5);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState<boolean>(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState<boolean>(false);
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +78,52 @@ export default function SettingsPanel({ profile, setProfile, onClearHistory }: S
       ...prev,
       balance: 100.0,
     }));
-    alert('User balance reset to default $100.00!');
+    alert('User balance reset to default ₦100,000.00!');
+  };
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackText.trim()) return;
+
+    setIsSubmittingFeedback(true);
+    setFeedbackSuccess(false);
+
+    try {
+      const feedbackId = `fb-${Date.now()}`;
+      const roleLabel = profile.isDriver ? 'Driver' : profile.role === 'admin' ? 'Admin' : 'Rider';
+      const commentClean = feedbackText.trim();
+
+      const feedbackData = {
+        id: feedbackId,
+        userId: profile.id || profile.name,
+        userName: profile.name,
+        userRole: roleLabel,
+        category: feedbackCategory,
+        comment: commentClean,
+        rating: feedbackRating,
+        timestamp: Date.now()
+      };
+
+      // 1. Save directly to Firestore persistent collection
+      await saveFeedbackToFirestore(feedbackData);
+
+      // 2. Add log entry as 'ADMIN' category log
+      if (addAuditLog) {
+        addAuditLog(
+          'ADMIN',
+          `[Feedback Submitted] ${roleLabel} ${profile.name} (${feedbackCategory}): "${commentClean}"`
+        );
+      }
+
+      setFeedbackSuccess(true);
+      setFeedbackText('');
+      setTimeout(() => setFeedbackSuccess(false), 5000);
+    } catch (err) {
+      console.error('Failed to save feedback to Firestore:', err);
+      alert('Error submitting feedback. Please try again.');
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   return (
@@ -189,7 +251,99 @@ export default function SettingsPanel({ profile, setProfile, onClearHistory }: S
         </div>
       </div>
 
-      {/* 5. Utility Reset Actions */}
+      {/* 5. Submit Feedback Section (Saves to Firestore & Logs as ADMIN category) */}
+      <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare size={16} className="text-zinc-900" />
+            <h4 className="text-xs font-extrabold text-zinc-900">Submit Feedback & Comments</h4>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+            Firestore Connected
+          </span>
+        </div>
+
+        <p className="text-[11px] text-zinc-600 font-medium leading-relaxed">
+          Submit comments as a rider or driver. Feedback is permanently stored in Firestore and logged for ADMIN audit inspection.
+        </p>
+
+        <form onSubmit={handleFeedbackSubmit} className="space-y-3">
+          {/* Category Selector */}
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-700 mb-1">Feedback Category</label>
+            <div className="flex flex-wrap gap-1.5">
+              {['General', 'Bug Report', 'Driver Service', 'App Experience', 'Feature Request'].map((cat) => (
+                <button
+                  type="button"
+                  key={cat}
+                  onClick={() => setFeedbackCategory(cat)}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition ${
+                    feedbackCategory === cat
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-700 border-[#E5DFD3] hover:bg-zinc-50'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rating */}
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-700 mb-1">Experience Rating</label>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  type="button"
+                  key={star}
+                  onClick={() => setFeedbackRating(star)}
+                  className="p-1 hover:scale-110 transition"
+                >
+                  <Star
+                    size={16}
+                    className={star <= feedbackRating ? 'text-amber-500 fill-amber-500' : 'text-zinc-300'}
+                  />
+                </button>
+              ))}
+              <span className="text-[11px] font-extrabold text-zinc-700 ml-1.5">{feedbackRating}.0 / 5.0</span>
+            </div>
+          </div>
+
+          {/* Comment Textarea */}
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-700 mb-1">Comment / Feedback Message</label>
+            <textarea
+              rows={3}
+              required
+              placeholder={`Share your feedback as a ${profile.isDriver ? 'Driver' : 'Rider'}...`}
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="w-full bg-white text-xs border border-[#E5DFD3] rounded-lg p-2.5 outline-none focus:border-zinc-900 font-medium text-zinc-900 resize-none shadow-xs"
+              id="feedback-textarea"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmittingFeedback || !feedbackText.trim()}
+            className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-extrabold py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            id="submit-feedback-btn"
+          >
+            <Send size={13} />
+            {isSubmittingFeedback ? 'Saving to Firestore...' : 'Submit Feedback to Admin'}
+          </button>
+        </form>
+
+        {feedbackSuccess && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] font-extrabold flex items-center gap-2 animate-fade-in">
+            <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+            <span>Thank you! Your feedback is saved to Firestore and logged under ADMIN logs.</span>
+          </div>
+        )}
+      </div>
+
+      {/* 6. Utility Reset Actions */}
       <div className="pt-2 flex flex-col gap-2">
         <button
           onClick={handleResetEarnings}

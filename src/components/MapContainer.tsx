@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Location, Trip, TripStatus } from '../types';
-import { MapPin, Navigation, Car, AlertCircle, Info, Play, Pause, RotateCcw, X, FastForward, Activity, Radio, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, Car, AlertCircle, Info, Play, Pause, RotateCcw, X, FastForward, Activity, Radio, RefreshCw, CheckCircle, Clock, DollarSign, User } from 'lucide-react';
 import { CITIES } from '../data';
 
 export interface MapContainerProps {
@@ -17,6 +17,7 @@ export interface MapContainerProps {
   setOrigin: (loc: Location | null) => void;
   setDestination: (loc: Location | null) => void;
   trip: Trip | null;
+  completedTrips?: Trip[];
   isDriverMode: boolean;
   driverPosition: { lat: number; lng: number } | null;
   roamingCars: { id: string; lat: number; lng: number; angle: number; type: string }[];
@@ -229,6 +230,7 @@ function GoogleMapWrapper({
   origin: initialOrigin,
   destination: initialDestination,
   trip,
+  completedTrips,
   isDriverMode,
   driverPosition,
   roamingCars,
@@ -237,6 +239,7 @@ function GoogleMapWrapper({
   replayProgress,
 }: MapContainerProps & { replayProgress?: number }) {
   const [mapCenter, setMapCenter] = useState(city.center);
+  const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
 
   const activeOrigin = replayingTrip ? replayingTrip.origin : initialOrigin;
   const activeDestination = replayingTrip ? replayingTrip.destination : initialDestination;
@@ -301,6 +304,79 @@ function GoogleMapWrapper({
             </div>
           </AdvancedMarker>
         ))}
+
+        {/* Completed Trips Starting Points Markers with Interactive Tooltips */}
+        {completedTrips && completedTrips.map((cTrip) => {
+          if (!cTrip.origin) return null;
+          const isHovered = hoveredTripId === cTrip.id;
+          return (
+            <AdvancedMarker
+              key={`completed-trip-marker-${cTrip.id}`}
+              position={{ lat: cTrip.origin.lat, lng: cTrip.origin.lng }}
+              title={`Completed Trip: ${cTrip.origin.label}`}
+              zIndex={isHovered ? 200 : 20}
+            >
+              <div
+                className="relative group cursor-pointer"
+                onMouseEnter={() => setHoveredTripId(cTrip.id)}
+                onMouseLeave={() => setHoveredTripId(null)}
+              >
+                {/* Completed Trip Starting Pin */}
+                <div className={`p-1.5 rounded-full border-2 transition-all duration-200 shadow-xl flex items-center justify-center ${
+                  isHovered
+                    ? 'bg-purple-600 border-white text-white scale-125 ring-4 ring-purple-500/40 z-50'
+                    : 'bg-zinc-950 border-purple-400 text-purple-300 hover:scale-110'
+                }`}>
+                  <MapPin size={14} className="fill-purple-400 text-zinc-950" />
+                </div>
+
+                {/* Interactive Tooltip on Hover */}
+                {isHovered && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-zinc-950/95 text-white border border-purple-500/60 p-3 rounded-2xl shadow-2xl backdrop-blur-md z-50 pointer-events-auto space-y-2 text-left animate-fade-in">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+                      <span className="text-[10px] font-mono font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle size={12} className="text-purple-400" />
+                        Completed Trip #{cTrip.id.slice(-6)}
+                      </span>
+                      <span className="text-emerald-400 font-extrabold text-xs font-mono">
+                        ₦{cTrip.price?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || cTrip.price}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-400 font-medium flex items-center gap-1">
+                          <User size={11} className="text-zinc-400" />
+                          Driver:
+                        </span>
+                        <span className="font-bold text-white truncate max-w-[130px]">{cTrip.driver?.name || 'Driver'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-400 font-medium flex items-center gap-1">
+                          <Car size={11} className="text-zinc-400" />
+                          Vehicle:
+                        </span>
+                        <span className="font-mono text-zinc-200">{cTrip.driver?.vehicleName || 'Standard'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span className="text-zinc-400 font-medium flex items-center gap-1">
+                          <Clock size={11} className="text-amber-400" />
+                          Duration:
+                        </span>
+                        <span className="font-mono text-amber-400 font-extrabold">{cTrip.durationMinutes || 15} mins ({cTrip.distanceMiles || 0} km)</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-zinc-800/80 text-[10px] text-zinc-400 space-y-0.5">
+                      <div className="truncate"><strong className="text-emerald-400">Pickup:</strong> {cTrip.origin?.label}</div>
+                      <div className="truncate"><strong className="text-rose-400">Dropoff:</strong> {cTrip.destination?.label}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AdvancedMarker>
+          );
+        })}
 
         {/* Google Maps Route Renderer */}
         {(activeOrigin && activeDestination) && (
@@ -425,6 +501,7 @@ function CanvasMapFallback({
   setOrigin,
   setDestination,
   trip,
+  completedTrips,
   isDriverMode,
   driverPosition,
   roamingCars,
@@ -436,6 +513,8 @@ function CanvasMapFallback({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredLandmark, setHoveredLandmark] = useState<number | null>(null);
+  const [hoveredCompletedTrip, setHoveredCompletedTrip] = useState<Trip | null>(null);
+  const [hoveredCompletedTripPos, setHoveredCompletedTripPos] = useState<{ x: number; y: number } | null>(null);
 
   const origin = replayingTrip ? replayingTrip.origin : initialOrigin;
   const destination = replayingTrip ? replayingTrip.destination : initialDestination;
@@ -999,7 +1078,37 @@ function CanvasMapFallback({
       ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [dimensions, city, origin, destination, trip, isDriverMode, driverPosition, roamingCars, hoveredLandmark, travelMode]);
+
+    // 9. Draw Completed Trips Starting Point Markers
+    if (completedTrips && completedTrips.length > 0) {
+      completedTrips.forEach((cTrip) => {
+        if (!cTrip.origin) return;
+        const pt = project(cTrip.origin.lat, cTrip.origin.lng);
+        const isHovered = hoveredCompletedTrip?.id === cTrip.id;
+
+        if (isHovered) {
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)'; // purple ring
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 16 + Math.sin(Date.now() / 120) * 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = isHovered ? '#a855f7' : '#9333ea';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, isHovered ? 10 : 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  }, [dimensions, city, origin, destination, trip, completedTrips, isDriverMode, driverPosition, roamingCars, hoveredLandmark, hoveredCompletedTrip, travelMode]);
 
   // Request Animation Frame to animate elements smoothly (ripples, roaming cars)
   useEffect(() => {
@@ -1117,6 +1226,26 @@ function CanvasMapFallback({
     }
 
     setHoveredLandmark(hoverIdx !== -1 ? hoverIdx : null);
+
+    // Check completed trips starting points hover
+    let hoveredCTrip: Trip | null = null;
+    let hoveredCTripPos: { x: number; y: number } | null = null;
+
+    if (completedTrips && completedTrips.length > 0) {
+      for (const cTrip of completedTrips) {
+        if (!cTrip.origin) continue;
+        const pt = project(cTrip.origin.lat, cTrip.origin.lng);
+        const dist = Math.hypot(pt.x - x, pt.y - y);
+        if (dist < 18) {
+          hoveredCTrip = cTrip;
+          hoveredCTripPos = pt;
+          break;
+        }
+      }
+    }
+
+    setHoveredCompletedTrip(hoveredCTrip);
+    setHoveredCompletedTripPos(hoveredCTripPos);
   };
 
   return (
@@ -1147,6 +1276,56 @@ function CanvasMapFallback({
           <span>Simulation Map Fallback Active</span>
         </div>
       </div>
+
+      {/* Interactive Tooltip Overlay for Completed Trips in Canvas Mode */}
+      {hoveredCompletedTrip && hoveredCompletedTripPos && (
+        <div
+          style={{
+            left: Math.min(Math.max(hoveredCompletedTripPos.x, 140), dimensions.width - 140),
+            top: Math.max(hoveredCompletedTripPos.y - 12, 10)
+          }}
+          className="absolute -translate-x-1/2 -translate-y-full mb-2 w-64 bg-zinc-950/95 text-white border border-purple-500/60 p-3 rounded-2xl shadow-2xl backdrop-blur-md z-40 pointer-events-none space-y-2 text-left animate-fade-in"
+        >
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+            <span className="text-[10px] font-mono font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-1">
+              <CheckCircle size={12} className="text-purple-400" />
+              Completed Trip #{hoveredCompletedTrip.id.slice(-6)}
+            </span>
+            <span className="text-emerald-400 font-extrabold text-xs font-mono">
+              ₦{hoveredCompletedTrip.price?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || hoveredCompletedTrip.price}
+            </span>
+          </div>
+
+          <div className="space-y-1 text-[11px]">
+            <div className="flex items-center justify-between text-zinc-300">
+              <span className="text-zinc-400 font-medium flex items-center gap-1">
+                <User size={11} className="text-zinc-400" />
+                Driver:
+              </span>
+              <span className="font-bold text-white truncate max-w-[130px]">{hoveredCompletedTrip.driver?.name || 'Driver'}</span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-300">
+              <span className="text-zinc-400 font-medium flex items-center gap-1">
+                <Car size={11} className="text-zinc-400" />
+                Vehicle:
+              </span>
+              <span className="font-mono text-zinc-200">{hoveredCompletedTrip.driver?.vehicleName || 'Standard'}</span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-300">
+              <span className="text-zinc-400 font-medium flex items-center gap-1">
+                <Clock size={11} className="text-amber-400" />
+                Duration:
+              </span>
+              <span className="font-mono text-amber-400 font-extrabold">{hoveredCompletedTrip.durationMinutes || 15} mins ({hoveredCompletedTrip.distanceMiles || 0} km)</span>
+            </div>
+          </div>
+
+          <div className="pt-1 border-t border-zinc-800/80 text-[10px] text-zinc-400 space-y-0.5">
+            <div className="truncate"><strong className="text-emerald-400">Pickup:</strong> {hoveredCompletedTrip.origin?.label}</div>
+            <div className="truncate"><strong className="text-rose-400">Dropoff:</strong> {hoveredCompletedTrip.destination?.label}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

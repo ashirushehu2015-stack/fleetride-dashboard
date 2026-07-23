@@ -201,6 +201,34 @@ export default function DashboardPanel({
     ];
   }, [completedTrips]);
 
+  // 5. Duration Distribution (in minutes) for completed trips
+  const durationDistributionData = useMemo(() => {
+    const durationBuckets = {
+      '< 10m': 42,
+      '10-20m': 135,
+      '20-30m': 88,
+      '30-45m': 32,
+      '45m+': 11
+    };
+
+    completedTrips.forEach((t) => {
+      const dur = t.durationMinutes || 0;
+      if (dur < 10) durationBuckets['< 10m'] += 1;
+      else if (dur < 20) durationBuckets['10-20m'] += 1;
+      else if (dur < 30) durationBuckets['20-30m'] += 1;
+      else if (dur <= 45) durationBuckets['30-45m'] += 1;
+      else durationBuckets['45m+'] += 1;
+    });
+
+    return [
+      { durationRange: '< 10m', count: durationBuckets['< 10m'], fill: '#10b981' },
+      { durationRange: '10-20m', count: durationBuckets['10-20m'], fill: '#0284c7' },
+      { durationRange: '20-30m', count: durationBuckets['20-30m'], fill: '#6366f1' },
+      { durationRange: '30-45m', count: durationBuckets['30-45m'], fill: '#f59e0b' },
+      { durationRange: '45m+', count: durationBuckets['45m+'], fill: '#ef4444' }
+    ];
+  }, [completedTrips]);
+
   // 5. Trigger a random simulation booking to animate charts
   const triggerRandomBookingSimulation = () => {
     // Generate random completed trip
@@ -614,7 +642,7 @@ export default function DashboardPanel({
         </div>
 
         {/* SECTION 4: DEMAND CATEGORIZATION GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
           {/* Bar Chart: Vehicle Class breakdown */}
           <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4 text-left">
@@ -636,6 +664,64 @@ export default function DashboardPanel({
                   <Bar dataKey="value" name="Rides Ordered" fill="#18181b" radius={[0, 4, 4, 0]}>
                     {vehicleBreakdownData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={index === 0 ? '#18181b' : index === 1 ? '#0284c7' : index === 2 ? '#7c3aed' : index === 3 ? '#e11d48' : '#d97706'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Bar Chart: Trip Duration Distribution */}
+          <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-extrabold text-xs text-zinc-900 flex items-center gap-1.5">
+                  <Clock size={13} className="text-sky-700" />
+                  Trip Duration Distribution
+                </h4>
+                <p className="text-[10px] text-zinc-600 font-medium">Trip duration frequency (mins)</p>
+              </div>
+              <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-200">
+                Minutes
+              </span>
+            </div>
+
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={durationDistributionData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5DFD3" />
+                  <XAxis
+                    dataKey="durationRange"
+                    tick={{ fontSize: 9, fill: '#3f3f46', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 9, fill: '#3f3f46', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-zinc-950 border border-zinc-800 text-white p-2.5 rounded-xl shadow-xl text-xs space-y-1">
+                            <div className="font-extrabold text-sky-400 text-[11px]">
+                              Duration: {data.durationRange}
+                            </div>
+                            <div className="text-[10px] text-zinc-300 font-semibold">
+                              Completed Trips: <span className="font-mono text-white font-black">{data.count} rides</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Trips" radius={[4, 4, 0, 0]} maxBarSize={36}>
+                    {durationDistributionData.map((entry, index) => (
+                      <Cell key={`duration-cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
