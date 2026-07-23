@@ -539,6 +539,7 @@ export default function App() {
                 sender: 'driver',
                 text: greetArrive,
                 timestamp: new Date().toISOString(),
+                status: 'read',
               },
             ]);
           }, 1000);
@@ -584,6 +585,7 @@ export default function App() {
               sender: 'driver',
               text: greetTrip,
               timestamp: new Date().toISOString(),
+              status: 'read',
             },
           ]);
         }, 1500);
@@ -676,9 +678,39 @@ export default function App() {
     setChatMessages([]);
   };
 
-  const handleCompleteTripRating = (rating: number, reviewText: string) => {
-    // Save rating summary to analytics list, then return to idle state
+  const handleCompleteTripRating = (rating: number, reviewText: string, tipAmount: number = 0) => {
+    // Save rating summary and tip to analytics list, update driver balance, then return to idle state
     if (trip) {
+      if (tipAmount > 0) {
+        // Update driver balance in drivers list
+        setDrivers((prevDrivers) =>
+          prevDrivers.map((d) => {
+            if (d.name === trip.driver.name || d.id === trip.driver.phone) {
+              const currentBal = d.balance || 0;
+              return {
+                ...d,
+                balance: currentBal + tipAmount,
+              };
+            }
+            return d;
+          })
+        );
+
+        // Deduct tip from active rider profile balance if available
+        if (profile) {
+          setProfile((prev) => ({
+            ...prev,
+            balance: Math.max(0, (prev.balance || 0) - tipAmount),
+          }));
+        }
+
+        // Create audit log entry
+        addAuditLog(
+          'RIDER',
+          `${profile.name || 'Rider'} tipped driver ${trip.driver.name} ₦${tipAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for completed trip #${trip.id}.`
+        );
+      }
+
       setCompletedTrips((current) => {
         const index = current.findIndex(t => t.id === trip.id);
         if (index !== -1) {
@@ -686,11 +718,12 @@ export default function App() {
           updated[index] = {
             ...updated[index],
             rating,
-            review: reviewText
+            review: reviewText,
+            tip: tipAmount
           };
           return updated;
         } else {
-          return [...current, { ...trip, rating, review: reviewText, status: 'COMPLETED' as const }];
+          return [...current, { ...trip, rating, review: reviewText, tip: tipAmount, status: 'COMPLETED' as const }];
         }
       });
     }
@@ -702,14 +735,30 @@ export default function App() {
 
   // Passenger Sends chat message, automatic driver response trigger
   const handleSendMessage = (text: string) => {
+    const msgId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newMsg: ChatMessage = {
-      id: Math.random().toString(),
+      id: msgId,
       sender: 'rider',
       text,
       timestamp: new Date().toISOString(),
+      status: 'sent',
     };
 
     setChatMessages((prev) => [...prev, newMsg]);
+
+    // Step 1: Upgrade to 'delivered' after 600ms
+    setTimeout(() => {
+      setChatMessages((prev) =>
+        prev.map((msg) => (msg.id === msgId ? { ...msg, status: 'delivered' } : msg))
+      );
+    }, 600);
+
+    // Step 2: Upgrade to 'read' after 1300ms
+    setTimeout(() => {
+      setChatMessages((prev) =>
+        prev.map((msg) => (msg.id === msgId ? { ...msg, status: 'read' } : msg))
+      );
+    }, 1300);
 
     // Driver automatic reply simulator
     if (trip) {
@@ -741,9 +790,10 @@ export default function App() {
             sender: 'driver',
             text: reply,
             timestamp: new Date().toISOString(),
+            status: 'read',
           },
         ]);
-      }, 1500);
+      }, 1800);
     }
   };
 

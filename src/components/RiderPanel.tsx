@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import VoiceCallModal from './VoiceCallModal';
+import SafetyToolkitModal from './SafetyToolkitModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import {
@@ -20,6 +21,7 @@ import {
   CreditCard,
   Send,
   Check,
+  CheckCheck,
   RotateCcw,
   Clock,
   Wallet,
@@ -33,7 +35,12 @@ import {
   ArrowUpRight,
   ArrowLeftRight,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Heart,
+  ShieldCheck,
+  ShieldAlert,
+  Share2,
+  Radio
 } from 'lucide-react';
 
 interface RiderPanelProps {
@@ -51,7 +58,7 @@ interface RiderPanelProps {
   trip: Trip | null;
   onBookTrip: (vehicleType: string, price: number, distance: number, duration: number) => void;
   onCancelTrip: () => void;
-  onCompleteTripRating: (rating: number, review: string) => void;
+  onCompleteTripRating: (rating: number, review: string, tipAmount?: number) => void;
   chatMessages: ChatMessage[];
   onSendMessage: (text: string) => void;
   isSurgeActive?: boolean;
@@ -92,9 +99,22 @@ export default function RiderPanel({
   const [duration, setDuration] = useState<number>(0);
   const [rating, setRating] = useState<number>(5);
   const [reviewText, setReviewText] = useState<string>('');
+  const [selectedTipPercent, setSelectedTipPercent] = useState<number | 'custom'>(10);
+  const [customTipAmount, setCustomTipAmount] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
+
+  const calculateTipAmount = (): number => {
+    if (!trip) return 0;
+    if (selectedTipPercent === 'custom') {
+      const parsed = parseFloat(customTipAmount);
+      return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    }
+    if (selectedTipPercent === 0) return 0;
+    return Math.round((trip.price * selectedTipPercent) / 100);
+  };
   const [showChat, setShowChat] = useState<boolean>(false);
   const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
+  const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Passenger Navigation & Wallet Sub-states
@@ -1537,31 +1557,64 @@ export default function RiderPanel({
                   </div>
                 </div>
 
-                {/* Communication Actions */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E5DFD3]">
+                {/* Communication & Safety Actions */}
+                <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-[#E5DFD3]">
                   <button
                     onClick={() => setShowChat(!showChat)}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition border cursor-pointer ${
+                    className={`py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition border cursor-pointer ${
                       showChat
                         ? 'bg-zinc-900 border-zinc-900 text-white'
                         : 'bg-white border-[#E5DFD3] text-zinc-900 hover:bg-[#F2EDE4]'
                     }`}
                     id="toggle-driver-chat-btn"
                   >
-                    <MessageSquare size={14} />
-                    {showChat ? 'Hide Chat' : 'Chat Driver'}
+                    <MessageSquare size={13} />
+                    {showChat ? 'Hide' : 'Chat'}
                     {chatMessages.length > 0 && !showChat && (
                       <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     )}
                   </button>
+
                   <button
                     onClick={() => setIsVoiceCallOpen(true)}
-                    className="py-2 px-3 bg-[#10B981] hover:bg-[#059669] text-white border border-[#059669] rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    className="py-2 px-2 bg-[#10B981] hover:bg-[#059669] text-white border border-[#059669] rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
                     id="call-driver-btn"
                   >
-                    <Phone size={14} /> Call Driver (VoIP)
+                    <Phone size={13} /> Call VoIP
+                  </button>
+
+                  <button
+                    onClick={() => setIsSafetyToolkitOpen(true)}
+                    className="py-2 px-2 bg-zinc-950 hover:bg-zinc-800 text-white border border-zinc-800 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                    id="open-safety-toolkit-btn"
+                  >
+                    <ShieldCheck size={14} className="text-emerald-400" /> Safety
                   </button>
                 </div>
+              </div>
+
+              {/* Ride Check Protection Banner */}
+              <div
+                onClick={() => setIsSafetyToolkitOpen(true)}
+                className="bg-zinc-950 text-white p-3.5 rounded-xl border border-zinc-800 flex items-center justify-between cursor-pointer hover:bg-zinc-900 transition shadow-sm"
+                id="ride-check-active-banner"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400 shrink-0">
+                    <Radio size={16} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-400 font-extrabold uppercase tracking-widest block">
+                      RIDE CHECK ACTIVE
+                    </span>
+                    <p className="text-xs font-bold text-zinc-200">
+                      Monitoring route stops & anomalies
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-extrabold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-lg shrink-0">
+                  Toolkit ➔
+                </span>
               </div>
 
               {/* Chat Interface Drawer/Overlay */}
@@ -1603,16 +1656,37 @@ export default function RiderPanel({
                               }`}
                             >
                               <p className="leading-relaxed font-medium">{msg.text}</p>
-                              <span
-                                className={`text-[8px] block text-right mt-1 ${
-                                  isRider ? 'text-zinc-400' : 'text-zinc-500'
-                                }`}
-                              >
-                                {new Date(msg.timestamp).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </span>
+                              <div className="flex items-center justify-between gap-3 mt-1 pt-0.5 border-t border-white/10">
+                                <span
+                                  className={`text-[8px] font-mono ${
+                                    isRider ? 'text-zinc-400' : 'text-zinc-500'
+                                  }`}
+                                >
+                                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+
+                                {isRider && (
+                                  <div className="flex items-center gap-0.5 text-[9px] shrink-0">
+                                    {msg.status === 'read' ? (
+                                      <span className="flex items-center text-emerald-400 font-extrabold gap-0.5" title="Read by driver">
+                                        <CheckCheck size={12} className="stroke-[2.5]" />
+                                        <span className="text-[8px] font-sans uppercase font-bold tracking-tight">Seen</span>
+                                      </span>
+                                    ) : msg.status === 'delivered' ? (
+                                      <span className="flex items-center text-zinc-300 gap-0.5" title="Delivered">
+                                        <CheckCheck size={12} />
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center text-zinc-400 gap-0.5" title="Sent">
+                                        <Check size={12} />
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -1706,6 +1780,74 @@ export default function RiderPanel({
               </div>
             </div>
 
+            {/* Tip Driver Feature */}
+            <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] text-left space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-zinc-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Heart size={14} className="text-rose-500 fill-rose-500" /> Tip {trip.driver.name}
+                </span>
+                {calculateTipAmount() > 0 && (
+                  <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full animate-fade-in">
+                    +₦{calculateTipAmount().toLocaleString()} Tip
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-zinc-600 font-medium">
+                Show your appreciation! 100% of your tip goes directly to {trip.driver.name}.
+              </p>
+
+              {/* Tip Percentage Selection Grid */}
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { label: 'None', percent: 0 },
+                  { label: '5%', percent: 5 },
+                  { label: '10%', percent: 10 },
+                  { label: '15%', percent: 15 },
+                  { label: 'Custom', percent: 'custom' as const },
+                ].map((opt) => {
+                  const isSelected = selectedTipPercent === opt.percent;
+                  const tipVal = typeof opt.percent === 'number' && opt.percent > 0 ? Math.round((trip.price * opt.percent) / 100) : null;
+                  
+                  return (
+                    <button
+                      key={String(opt.percent)}
+                      type="button"
+                      onClick={() => setSelectedTipPercent(opt.percent)}
+                      className={`py-2 px-1 rounded-xl text-center border transition cursor-pointer flex flex-col items-center justify-center ${
+                        isSelected
+                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm font-bold'
+                          : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-zinc-100 font-semibold'
+                      }`}
+                      id={`tip-opt-${opt.percent}`}
+                    >
+                      <span className="text-xs font-bold">{opt.label}</span>
+                      {tipVal !== null && (
+                        <span className={`text-[9px] ${isSelected ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                          ₦{tipVal}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom Tip Input */}
+              {selectedTipPercent === 'custom' && (
+                <div className="pt-1 flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-700">₦</span>
+                  <input
+                    type="number"
+                    placeholder="Enter custom tip (e.g. 500)"
+                    value={customTipAmount}
+                    onChange={(e) => setCustomTipAmount(e.target.value)}
+                    className="flex-1 bg-white border border-[#E5DFD3] rounded-lg px-3 py-1.5 text-xs outline-none text-zinc-900 font-bold focus:border-zinc-900"
+                    id="custom-tip-input-field"
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Rating Stars Selection */}
             <div className="space-y-2">
               <span className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider block">
@@ -1747,14 +1889,17 @@ export default function RiderPanel({
 
             <button
               onClick={() => {
-                onCompleteTripRating(rating, reviewText);
+                const tipVal = calculateTipAmount();
+                onCompleteTripRating(rating, reviewText, tipVal);
                 setReviewText('');
                 setRating(5);
+                setSelectedTipPercent(10);
+                setCustomTipAmount('');
               }}
-              className="w-full bg-zinc-900 text-white font-extrabold py-3 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-1 text-xs shadow-md cursor-pointer"
+              className="w-full bg-zinc-900 text-white font-extrabold py-3.5 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-1.5 text-xs shadow-md cursor-pointer"
               id="submit-rating-and-review-btn"
             >
-              Submit Feedback
+              Submit Feedback {calculateTipAmount() > 0 ? `& Send ₦${calculateTipAmount().toLocaleString()} Tip` : ''}
             </button>
           </div>
         )}
@@ -1781,6 +1926,18 @@ export default function RiderPanel({
           }}
         />
       )}
+
+      {/* Safety Toolkit & Ride Check Modal */}
+      <SafetyToolkitModal
+        isOpen={isSafetyToolkitOpen}
+        onClose={() => setIsSafetyToolkitOpen(false)}
+        trip={trip}
+        onTriggerEmergency={() => {
+          if (addAuditLog) {
+            addAuditLog('RIDER', `Emergency Assist triggered by rider for trip #${trip?.id || 'Active'}`);
+          }
+        }}
+      />
     </div>
   );
 }

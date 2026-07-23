@@ -1,10 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import VoiceCallModal from './VoiceCallModal';
+import SafetyToolkitModal from './SafetyToolkitModal';
 import { UserProfile, Location, Trip } from '../types';
 import { MOCK_PASSENGERS } from '../data';
 import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Cell,
+  AreaChart,
+  Area
+} from 'recharts';
+import {
   Car,
   Check,
+  CheckCheck,
   Navigation,
   X,
   TrendingUp,
@@ -19,7 +33,13 @@ import {
   Star,
   Phone,
   MessageSquare,
-  Send
+  Send,
+  ShieldCheck,
+  BarChart3,
+  LineChart,
+  Calendar,
+  DollarSign,
+  Zap
 } from 'lucide-react';
 
 interface DriverPanelProps {
@@ -61,6 +81,65 @@ interface SimulatedOffer {
   countdown: number;
 }
 
+// Helper function to generate last 7 days driver earnings
+const getInitialWeeklyEarnings = () => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const today = new Date();
+  const list = [];
+  const baseEarnings = [18500, 24200, 15800, 32000, 28400, 21000, 35600];
+  const baseTrips = [6, 9, 5, 12, 10, 7, 14];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    const dayName = i === 0 ? 'Today' : days[d.getDay()];
+    const dateFormatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const idx = (d.getDay() + 3) % 7;
+    const fare = baseEarnings[idx];
+    const tips = Math.round(fare * 0.08);
+
+    list.push({
+      day: dayName,
+      date: dateFormatted,
+      fare,
+      tips,
+      earnings: fare + tips,
+      trips: baseTrips[idx],
+      isToday: i === 0
+    });
+  }
+  return list;
+};
+
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-zinc-950 text-white border border-zinc-800 p-2.5 rounded-xl shadow-xl text-xs space-y-1">
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-800 pb-1">
+          <span className="font-mono text-zinc-400 font-extrabold uppercase text-[10px]">{data.date} ({data.day})</span>
+          {data.isToday && (
+            <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
+              Today
+            </span>
+          )}
+        </div>
+        <div className="text-sm font-black text-emerald-400">
+          ₦{data.earnings.toLocaleString()}
+        </div>
+        <div className="flex items-center justify-between gap-4 text-[11px] text-zinc-300 font-medium">
+          <span>Fares: ₦{data.fare.toLocaleString()}</span>
+          <span>Tips: ₦{data.tips.toLocaleString()}</span>
+        </div>
+        <div className="text-[10px] text-zinc-400 pt-0.5">
+          {data.trips} completed trips
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function DriverPanel({
   city,
   profile,
@@ -80,11 +159,35 @@ export default function DriverPanel({
   const [driveProgress, setDriveProgress] = useState<number>(0);
   const [recentEarnings, setRecentEarnings] = useState<number>(0);
   const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
+  const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState<boolean>(false);
   const [showDriverChat, setShowDriverChat] = useState<boolean>(false);
   const [driverChatInput, setDriverChatInput] = useState<string>('');
-  const [driverMessages, setDriverMessages] = useState<Array<{ id: string; sender: 'driver' | 'rider'; text: string; time: string }>>([
-    { id: '1', sender: 'rider', text: "Hello driver, I'm waiting at the pickup spot!", time: 'Just now' }
+  const [weeklyEarnings, setWeeklyEarnings] = useState(getInitialWeeklyEarnings);
+  const [chartType, setChartType] = useState<'bar' | 'area'>('bar');
+  const [driverMessages, setDriverMessages] = useState<Array<{ id: string; sender: 'driver' | 'rider'; text: string; time: string; status?: 'sent' | 'delivered' | 'read' }>>([
+    { id: '1', sender: 'rider', text: "Hello driver, I'm waiting at the pickup spot!", time: 'Just now', status: 'read' }
   ]);
+
+  const sendDriverMessage = (text: string) => {
+    if (!text.trim()) return;
+    const msgId = Date.now().toString();
+    setDriverMessages((prev) => [
+      ...prev,
+      { id: msgId, sender: 'driver', text: text.trim(), time: 'Just now', status: 'sent' }
+    ]);
+
+    setTimeout(() => {
+      setDriverMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, status: 'delivered' } : m))
+      );
+    }, 600);
+
+    setTimeout(() => {
+      setDriverMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, status: 'read' } : m))
+      );
+    }, 1300);
+  };
 
   // Synchronize isOnline state with parent App.tsx so it knows a driver is online
   useEffect(() => {
@@ -338,6 +441,20 @@ export default function DriverPanel({
     }));
     setRecentEarnings(activeTrip.price);
 
+    // Update weekly earnings today
+    setWeeklyEarnings((prev) =>
+      prev.map((item) =>
+        item.isToday
+          ? {
+              ...item,
+              fare: item.fare + activeTrip.price,
+              earnings: item.earnings + activeTrip.price,
+              trips: item.trips + 1,
+            }
+          : item
+      )
+    );
+
     // Clear parent trip if synchronized
     if (existingTrip && existingTrip.id === activeTrip.id) {
       if (setExistingTrip) {
@@ -420,6 +537,132 @@ export default function DriverPanel({
                 <div className="text-xl font-extrabold text-zinc-900 flex items-center gap-1">
                   {profile.rating.toFixed(2)}
                   <Star size={16} className="text-amber-500 fill-amber-500 inline" />
+                </div>
+              </div>
+            </div>
+
+            {/* 7-Day Visual Analytics Chart */}
+            <div className="pt-3 border-t border-[#E5DFD3] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={14} className="text-emerald-700" />
+                  <span className="text-xs font-extrabold text-zinc-800 uppercase tracking-wider">
+                    Last 7 Days Performance
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 bg-white border border-[#E5DFD3] p-0.5 rounded-lg shadow-2xs">
+                  <button
+                    onClick={() => setChartType('bar')}
+                    className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                      chartType === 'bar' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                    title="Bar Chart"
+                    id="driver-chart-type-bar"
+                  >
+                    <BarChart3 size={12} /> Bar
+                  </button>
+                  <button
+                    onClick={() => setChartType('area')}
+                    className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                      chartType === 'area' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                    title="Area Trend"
+                    id="driver-chart-type-area"
+                  >
+                    <LineChart size={12} /> Trend
+                  </button>
+                </div>
+              </div>
+
+              {/* 7-Day Summary Chips */}
+              <div className="grid grid-cols-3 gap-1.5 text-center">
+                <div className="bg-white p-2 rounded-lg border border-[#E5DFD3] shadow-2xs">
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">7-Day Total</span>
+                  <span className="text-xs font-black text-emerald-700">₦{weeklyEarnings.reduce((a, b) => a + b.earnings, 0).toLocaleString()}</span>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-[#E5DFD3] shadow-2xs">
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">Daily Avg</span>
+                  <span className="text-xs font-black text-zinc-800">₦{Math.round(weeklyEarnings.reduce((a, b) => a + b.earnings, 0) / 7).toLocaleString()}</span>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-[#E5DFD3] shadow-2xs">
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">Trips Done</span>
+                  <span className="text-xs font-black text-zinc-800">{weeklyEarnings.reduce((a, b) => a + b.trips, 0)} rides</span>
+                </div>
+              </div>
+
+              {/* Chart Visual Surface */}
+              <div className="bg-white p-3 rounded-xl border border-[#E5DFD3] shadow-xs space-y-2">
+                <div className="h-44 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartType === 'bar' ? (
+                      <BarChart data={weeklyEarnings} margin={{ top: 10, right: 10, left: -22, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F2EDE4" />
+                        <XAxis
+                          dataKey="day"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 10, fill: '#71717A', fontWeight: 700 }}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 9, fill: '#A1A1AA' }}
+                          tickFormatter={(val) => `₦${val >= 1000 ? `${Math.round(val / 1000)}k` : val}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="earnings" radius={[6, 6, 0, 0]} animationDuration={800}>
+                          {weeklyEarnings.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.isToday ? '#047857' : '#10B981'}
+                              opacity={entry.isToday ? 1 : 0.85}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    ) : (
+                      <AreaChart data={weeklyEarnings} margin={{ top: 10, right: 10, left: -22, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F2EDE4" />
+                        <XAxis
+                          dataKey="day"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 10, fill: '#71717A', fontWeight: 700 }}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 9, fill: '#A1A1AA' }}
+                          tickFormatter={(val) => `₦${val >= 1000 ? `${Math.round(val / 1000)}k` : val}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Area
+                          type="monotone"
+                          dataKey="earnings"
+                          stroke="#047857"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#earningsGrad)"
+                        />
+                      </AreaChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 font-semibold pt-2 border-t border-[#F2EDE4]">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-700 inline-block" /> Dark green = Today
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/80 inline-block" /> Past 6 Days
+                  </span>
                 </div>
               </div>
             </div>
@@ -599,7 +842,7 @@ export default function DriverPanel({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setShowDriverChat(!showDriverChat)}
                     className="p-2 bg-white hover:bg-zinc-100 border border-[#E5DFD3] rounded-lg text-zinc-900 transition cursor-pointer"
@@ -610,10 +853,18 @@ export default function DriverPanel({
                   </button>
                   <button
                     onClick={() => setIsVoiceCallOpen(true)}
-                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 transition cursor-pointer shadow-xs"
                     id="driver-call-passenger-btn"
                   >
-                    <Phone size={13} /> Call Passenger
+                    <Phone size={13} /> Call
+                  </button>
+                  <button
+                    onClick={() => setIsSafetyToolkitOpen(true)}
+                    className="p-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 transition cursor-pointer shadow-xs"
+                    title="Safety Toolkit"
+                    id="driver-safety-toolkit-btn"
+                  >
+                    <ShieldCheck size={15} className="text-emerald-400" />
                   </button>
                 </div>
               </div>
@@ -641,7 +892,25 @@ export default function DriverPanel({
                               : 'bg-zinc-100 text-zinc-800 border border-zinc-200'
                           }`}
                         >
-                          {m.text}
+                          <p>{m.text}</p>
+                          {m.sender === 'driver' && (
+                            <div className="flex items-center justify-end gap-1 mt-0.5 text-[9px]">
+                              {m.status === 'read' ? (
+                                <span className="flex items-center text-emerald-400 font-bold gap-0.5" title="Seen by passenger">
+                                  <CheckCheck size={11} className="stroke-[2.5]" />
+                                  <span className="text-[7.5px] uppercase">Seen</span>
+                                </span>
+                              ) : m.status === 'delivered' ? (
+                                <span className="flex items-center text-zinc-300 gap-0.5" title="Delivered">
+                                  <CheckCheck size={11} />
+                                </span>
+                              ) : (
+                                <span className="flex items-center text-zinc-400 gap-0.5" title="Sent">
+                                  <Check size={11} />
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -658,13 +927,8 @@ export default function DriverPanel({
                       <button
                         key={idx}
                         type="button"
-                        onClick={() => {
-                          setDriverMessages((prev) => [
-                            ...prev,
-                            { id: Date.now().toString(), sender: 'driver', text: pill, time: 'Just now' }
-                          ]);
-                        }}
-                        className="shrink-0 px-2 py-0.5 bg-zinc-50 hover:bg-zinc-200 border border-zinc-200 rounded-full text-[10px] font-bold text-zinc-700"
+                        onClick={() => sendDriverMessage(pill)}
+                        className="shrink-0 px-2 py-0.5 bg-zinc-50 hover:bg-zinc-200 border border-zinc-200 rounded-full text-[10px] font-bold text-zinc-700 cursor-pointer"
                       >
                         {pill}
                       </button>
@@ -674,11 +938,7 @@ export default function DriverPanel({
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (!driverChatInput.trim()) return;
-                      setDriverMessages((prev) => [
-                        ...prev,
-                        { id: Date.now().toString(), sender: 'driver', text: driverChatInput.trim(), time: 'Just now' }
-                      ]);
+                      sendDriverMessage(driverChatInput);
                       setDriverChatInput('');
                     }}
                     className="flex gap-1.5 pt-1"
@@ -690,7 +950,7 @@ export default function DriverPanel({
                       onChange={(e) => setDriverChatInput(e.target.value)}
                       className="flex-1 bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-1 text-[11px] outline-none font-medium"
                     />
-                    <button type="submit" className="bg-zinc-900 text-white px-2.5 py-1 rounded-lg text-xs">
+                    <button type="submit" className="bg-zinc-900 text-white px-2.5 py-1 rounded-lg text-xs cursor-pointer">
                       <Send size={12} />
                     </button>
                   </form>
@@ -801,6 +1061,36 @@ export default function DriverPanel({
           }}
         />
       )}
+
+      {/* Safety Toolkit & Ride Check Modal */}
+      <SafetyToolkitModal
+        isOpen={isSafetyToolkitOpen}
+        onClose={() => setIsSafetyToolkitOpen(false)}
+        trip={activeTrip ? {
+          id: activeTrip.id,
+          origin: activeTrip.origin,
+          destination: activeTrip.destination,
+          vehicleType: 'X',
+          price: activeTrip.price,
+          distanceMiles: activeTrip.distanceMiles,
+          durationMinutes: activeTrip.durationMinutes,
+          driver: {
+            name: 'You (Driver)',
+            rating: 4.9,
+            vehicleType: 'X',
+            vehicleName: 'Toyota Corolla',
+            plateNumber: 'KJA-889-XA',
+            avatar: '',
+            phone: '+234 803 123 4567',
+            completedTrips: 142
+          },
+          status: 'TRIP_IN_PROGRESS',
+          progress: driveProgress / 100,
+          routePoints: [],
+          currentPosition: activeTrip.origin,
+          timestamp: new Date().toISOString()
+        } : null}
+      />
     </div>
   );
 }

@@ -52,6 +52,7 @@ export interface Trip {
   currentPosition: { lat: number; lng: number };
   rating?: number;
   review?: string;
+  tip?: number;
   timestamp: string;
   passengerName?: string;
   passengerAvatar?: string;
@@ -63,6 +64,7 @@ export interface ChatMessage {
   sender: 'rider' | 'driver';
   text: string;
   timestamp: string;
+  status?: 'sent' | 'delivered' | 'read';
 }
 
 export interface UserProfile {
