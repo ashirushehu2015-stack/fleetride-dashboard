@@ -56,13 +56,13 @@ interface DashboardPanelProps {
 
 // Initial realistic data for the charts (if no rides completed yet, to make it look gorgeous)
 const BASE_DAILY_DATA = [
-  { day: 'Mon', revenue: 126000, rides: 28, moto: 5 },
-  { day: 'Tue', revenue: 153000, rides: 34, moto: 8 },
-  { day: 'Wed', revenue: 144000, rides: 31, moto: 6 },
-  { day: 'Thu', revenue: 192000, rides: 42, moto: 11 },
-  { day: 'Fri', revenue: 267000, rides: 58, moto: 18 },
-  { day: 'Sat', revenue: 336000, rides: 74, moto: 24 },
-  { day: 'Sun', revenue: 285000, rides: 62, moto: 19 }
+  { day: 'Mon', revenue: 126000, rides: 28 },
+  { day: 'Tue', revenue: 153000, rides: 34 },
+  { day: 'Wed', revenue: 144000, rides: 31 },
+  { day: 'Thu', revenue: 192000, rides: 42 },
+  { day: 'Fri', revenue: 267000, rides: 58 },
+  { day: 'Sat', revenue: 336000, rides: 74 },
+  { day: 'Sun', revenue: 285000, rides: 62 }
 ];
 
 export default function DashboardPanel({
@@ -79,15 +79,12 @@ export default function DashboardPanel({
   const stats = useMemo(() => {
     const userRevenue = completedTrips.reduce((acc, t) => acc + t.price, 0);
     const userRides = completedTrips.length;
-    const userMotoRides = completedTrips.filter(t => (t.vehicleType as any) === 'Moto').length;
 
     const baseRevenue = BASE_DAILY_DATA.reduce((acc, d) => acc + d.revenue, 0);
     const baseRides = BASE_DAILY_DATA.reduce((acc, d) => acc + d.rides, 0);
-    const baseMoto = BASE_DAILY_DATA.reduce((acc, d) => acc + d.moto, 0);
 
     const totalRevenue = baseRevenue + userRevenue;
     const totalRides = baseRides + userRides;
-    const totalMoto = baseMoto + userMotoRides;
 
     // Calculate average rating of completed rides (defaulting to 4.88)
     const userRatings = completedTrips.filter(t => t.rating !== undefined).map(t => t.rating!);
@@ -98,9 +95,8 @@ export default function DashboardPanel({
     return {
       revenue: totalRevenue,
       rides: totalRides,
-      motoShare: ((totalMoto / totalRides) * 100).toFixed(1),
       avgRating,
-      carbonSavedKg: (totalMoto * 1.4 + userRides * 0.2).toFixed(1) // simulated green metric
+      carbonSavedKg: (totalRides * 0.45).toFixed(1) // simulated green metric
     };
   }, [completedTrips]);
 
@@ -369,7 +365,7 @@ export default function DashboardPanel({
             </div>
             <div className="text-lg font-black text-emerald-700">{stats.carbonSavedKg} kg</div>
             <div className="text-[9px] mt-1 text-zinc-600 font-medium">
-              Powered by Moto & EVs
+              Powered by Hybrid & EVs
             </div>
           </div>
 

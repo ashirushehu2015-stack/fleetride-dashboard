@@ -890,7 +890,7 @@ function CanvasMapFallback({
         ctx.rotate(car.angle);
 
         // Vehicle glow
-        ctx.fillStyle = car.type === 'moto' ? '#a855f7' : '#facc15'; // purple vs yellow cab
+        ctx.fillStyle = '#facc15'; // yellow cab
         ctx.beginPath();
         // Triangle shape facing forward
         ctx.moveTo(8, 0);

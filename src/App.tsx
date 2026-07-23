@@ -290,7 +290,7 @@ export default function App() {
       lat: lm.lat + (Math.random() - 0.5) * 0.008,
       lng: lm.lng + (Math.random() - 0.5) * 0.008,
       angle: Math.random() * Math.PI * 2,
-      type: idx % 2 === 0 ? 'cab' : 'moto',
+      type: 'cab',
     }));
     setRoamingCars(cars);
   }, [currentCity]);
