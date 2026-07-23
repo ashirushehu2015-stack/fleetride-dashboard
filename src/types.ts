@@ -27,6 +27,21 @@ export interface Driver {
   completedTrips: number;
 }
 
+export interface ScheduledRide {
+  id: string;
+  origin: Location;
+  destination: Location;
+  vehicleType: VehicleType;
+  estimatedPrice: number;
+  scheduledDate: string; // e.g. YYYY-MM-DD
+  scheduledTime: string; // e.g. HH:mm
+  scheduledTimestamp: string; // ISO String
+  status: 'SCHEDULED' | 'DISPATCHED' | 'CANCELLED';
+  createdAt: string;
+  notes?: string;
+  travelMode?: 'municipal' | 'interstate';
+}
+
 export type TripStatus =
   | 'IDLE'
   | 'SEARCHING'

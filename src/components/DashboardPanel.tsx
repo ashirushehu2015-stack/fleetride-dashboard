@@ -49,6 +49,7 @@ interface DashboardPanelProps {
     zoom: number;
     landmarks: { lat: number; lng: number; label: string }[];
   };
+  onReplayTrip?: (trip: Trip) => void;
 }
 
 // Initial realistic data for the charts (if no rides completed yet, to make it look gorgeous)
@@ -67,7 +68,8 @@ export default function DashboardPanel({
   onTriggerRandomTrip,
   isSurgeActive,
   setIsSurgeActive,
-  currentCity
+  currentCity,
+  onReplayTrip,
 }: DashboardPanelProps) {
   const [activeMetric, setActiveMetric] = useState<'revenue' | 'rides'>('revenue');
 
@@ -538,11 +540,23 @@ export default function DashboardPanel({
                       </div>
                     </div>
 
-                    <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-[#E5DFD3]">
+                    <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-[#E5DFD3] gap-1.5">
                       <div className="font-extrabold text-emerald-700 text-sm">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-[9px] text-zinc-600 font-mono mt-0.5 font-bold">
+                      <div className="text-[9px] text-zinc-600 font-mono font-bold">
                         {trip.distanceMiles}km • {trip.durationMinutes}m
                       </div>
+                      {onReplayTrip && (
+                        <button
+                          type="button"
+                          onClick={() => onReplayTrip(trip)}
+                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-extrabold rounded-lg flex items-center gap-1 transition cursor-pointer shadow-2xs mt-1"
+                          title="Replay Route Animation"
+                          id={`dash-replay-trip-${trip.id}`}
+                        >
+                          <Play size={10} className="fill-white" />
+                          <span>Replay</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

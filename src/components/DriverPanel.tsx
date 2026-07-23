@@ -66,6 +66,7 @@ interface DriverPanelProps {
   setExistingTrip?: React.Dispatch<React.SetStateAction<Trip | null>>;
   isDriverOnline?: boolean;
   setIsDriverOnline?: (online: boolean) => void;
+  onReplayTrip?: (trip: Trip) => void;
 }
 
 interface SimulatedOffer {
@@ -151,6 +152,7 @@ export default function DriverPanel({
   setExistingTrip,
   isDriverOnline,
   setIsDriverOnline,
+  onReplayTrip,
 }: DriverPanelProps) {
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [activeOffer, setActiveOffer] = useState<SimulatedOffer | null>(null);
@@ -1027,13 +1029,49 @@ export default function DriverPanel({
               </div>
             </div>
 
-            <button
-              onClick={handleResetToIdle}
-              className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
-              id="driver-payout-dismiss-btn"
-            >
-              Back to Dashboard
-            </button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-[280px] mx-auto">
+              {onReplayTrip && activeTrip && (
+                <button
+                  type="button"
+                  onClick={() => onReplayTrip({
+                    id: activeTrip.id,
+                    origin: activeTrip.origin,
+                    destination: activeTrip.destination,
+                    vehicleType: 'X',
+                    price: activeTrip.price,
+                    distanceMiles: activeTrip.distance,
+                    durationMinutes: activeTrip.duration,
+                    driver: {
+                      name: 'You (Driver)',
+                      rating: 4.9,
+                      vehicleType: 'X',
+                      vehicleName: 'Toyota Corolla',
+                      plateNumber: 'KJA-889-XA',
+                      avatar: '',
+                      phone: '+234 803 123 4567',
+                      completedTrips: 142
+                    },
+                    status: 'COMPLETED',
+                    progress: 1,
+                    routePoints: [],
+                    currentPosition: activeTrip.destination,
+                    timestamp: new Date().toISOString()
+                  })}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  id="driver-replay-route-btn"
+                >
+                  <Play size={13} className="fill-white" /> Replay Route
+                </button>
+              )}
+
+              <button
+                onClick={handleResetToIdle}
+                className="w-full sm:w-auto px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                id="driver-payout-dismiss-btn"
+              >
+                Back to Dashboard
+              </button>
+            </div>
           </div>
         )}
       </div>

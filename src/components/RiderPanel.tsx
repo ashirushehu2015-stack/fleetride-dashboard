@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import VoiceCallModal from './VoiceCallModal';
 import SafetyToolkitModal from './SafetyToolkitModal';
-import { Location, VehicleConfig, Trip, ChatMessage, UserProfile } from '../types';
+import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import {
   MapPin,
@@ -40,7 +40,12 @@ import {
   ShieldCheck,
   ShieldAlert,
   Share2,
-  Radio
+  Radio,
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  Trash2,
+  Play
 } from 'lucide-react';
 
 interface RiderPanelProps {
@@ -69,6 +74,7 @@ interface RiderPanelProps {
   passengers?: any[];
   setPassengers?: React.Dispatch<React.SetStateAction<any[]>>;
   addAuditLog?: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
+  onReplayTrip?: (trip: Trip) => void;
 }
 
 export default function RiderPanel({
@@ -93,6 +99,7 @@ export default function RiderPanel({
   passengers,
   setPassengers,
   addAuditLog,
+  onReplayTrip,
 }: RiderPanelProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<string>('X');
   const [distance, setDistance] = useState<number>(0);
@@ -118,8 +125,53 @@ export default function RiderPanel({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Passenger Navigation & Wallet Sub-states
-  const [activeRiderSubTab, setActiveRiderSubTab] = useState<'booking' | 'wallet'>('booking');
+  const [activeRiderSubTab, setActiveRiderSubTab] = useState<'booking' | 'wallet' | 'scheduled'>('booking');
   const [walletSubSection, setWalletSubSection] = useState<'deposit' | 'transfer' | 'history'>('deposit');
+  
+  // Scheduled Rides State
+  const [bookingTiming, setBookingTiming] = useState<'now' | 'schedule'>('now');
+  const [scheduledDate, setScheduledDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [scheduledTime, setScheduledTime] = useState<string>('08:30');
+  const [scheduledNote, setScheduledNote] = useState<string>('');
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+  
+  const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>(() => {
+    const saved = localStorage.getItem('zamfara_scheduled_rides');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    return [
+      {
+        id: 'sched-101',
+        origin: { lat: 12.1702, lng: 6.6625, label: 'Gusau Central Motor Park' },
+        destination: { lat: 12.1645, lng: 6.6580, label: 'Federal University Gusau (FUGUS)' },
+        vehicleType: 'X',
+        estimatedPrice: 3850,
+        scheduledDate: tomorrowStr,
+        scheduledTime: '08:30',
+        scheduledTimestamp: `${tomorrowStr}T08:30:00`,
+        status: 'SCHEDULED',
+        createdAt: new Date().toISOString(),
+        notes: 'Airport terminal connection. Please arrive 5 mins early.',
+        travelMode: 'municipal'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_scheduled_rides', JSON.stringify(scheduledRides));
+  }, [scheduledRides]);
   
   // Deposit State
   const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'card' | 'ussd' | 'voucher'>('bank_transfer');
@@ -430,6 +482,70 @@ export default function RiderPanel({
     onBookTrip(selectedVehicle, finalPrice, distance, duration);
   };
 
+  const handleScheduleRideSubmit = () => {
+    if (!origin || !destination) return;
+    const config = VEHICLE_CONFIGS.find((v) => v.id === selectedVehicle);
+    if (!config) return;
+
+    const estimatedPrice = getPrice(config.multiplier);
+    const newRide: ScheduledRide = {
+      id: 'sched-' + Math.random().toString(36).substring(2, 10),
+      origin,
+      destination,
+      vehicleType: selectedVehicle,
+      estimatedPrice,
+      scheduledDate: scheduledDate || new Date().toISOString().split('T')[0],
+      scheduledTime: scheduledTime || '08:00',
+      scheduledTimestamp: `${scheduledDate}T${scheduledTime}:00`,
+      status: 'SCHEDULED',
+      createdAt: new Date().toISOString(),
+      notes: scheduledNote.trim() || undefined,
+      travelMode
+    };
+
+    setScheduledRides((prev) => [newRide, ...prev]);
+    setScheduleSuccessMsg(`Pickup successfully scheduled for ${newRide.scheduledDate} at ${newRide.scheduledTime}!`);
+    
+    if (addAuditLog && profile) {
+      addAuditLog('RIDER', `Scheduled pickup for ${scheduledDate} @ ${scheduledTime} from ${origin.label} to ${destination.label}`);
+    }
+
+    setScheduledNote('');
+  };
+
+  const handleDispatchScheduledRide = (sched: ScheduledRide) => {
+    setOrigin(sched.origin);
+    setDestination(sched.destination);
+    setSelectedVehicle(sched.vehicleType);
+    if (sched.travelMode) {
+      setTravelMode(sched.travelMode);
+    }
+    
+    // Mark as dispatched
+    setScheduledRides((prev) =>
+      prev.map((r) => (r.id === sched.id ? { ...r, status: 'DISPATCHED' } : r))
+    );
+
+    const config = VEHICLE_CONFIGS.find((v) => v.id === sched.vehicleType);
+    const price = sched.estimatedPrice || (config ? getPrice(config.multiplier) : 3500);
+    onBookTrip(sched.vehicleType, price, distance || 8, duration || 15);
+    
+    setActiveRiderSubTab('booking');
+  };
+
+  const handleCancelScheduledRide = (id: string) => {
+    setScheduledRides((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: 'CANCELLED' } : r))
+    );
+    if (addAuditLog) {
+      addAuditLog('RIDER', `Cancelled scheduled ride reservation #${id}`);
+    }
+  };
+
+  const handleDeleteScheduledRide = (id: string) => {
+    setScheduledRides((prev) => prev.filter((r) => r.id !== id));
+  };
+
   const handleSendChatMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -486,7 +602,7 @@ export default function RiderPanel({
             <button
               type="button"
               onClick={() => setActiveRiderSubTab('booking')}
-              className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer ${
                 activeRiderSubTab === 'booking'
                   ? 'bg-zinc-900 text-white shadow-sm'
                   : 'text-zinc-700 hover:text-zinc-950 hover:bg-white/50'
@@ -498,8 +614,26 @@ export default function RiderPanel({
             </button>
             <button
               type="button"
+              onClick={() => setActiveRiderSubTab('scheduled')}
+              className={`flex-1 py-2 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer ${
+                activeRiderSubTab === 'scheduled'
+                  ? 'bg-emerald-800 text-white shadow-sm'
+                  : 'text-zinc-700 hover:text-zinc-950 hover:bg-white/50'
+              }`}
+              id="rider-tab-scheduled-rides"
+            >
+              <CalendarClock size={14} />
+              Scheduled
+              {scheduledRides.filter((r) => r.status === 'SCHEDULED').length > 0 && (
+                <span className="bg-emerald-100 text-emerald-950 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ml-0.5">
+                  {scheduledRides.filter((r) => r.status === 'SCHEDULED').length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveRiderSubTab('wallet')}
-              className={`flex-1 py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer ${
                 activeRiderSubTab === 'wallet'
                   ? 'bg-emerald-700 text-white shadow-sm'
                   : 'text-zinc-700 hover:text-zinc-950 hover:bg-white/50'
@@ -507,8 +641,8 @@ export default function RiderPanel({
               id="rider-tab-passenger-wallet"
             >
               <Wallet size={14} />
-              Passenger Wallet
-              <span className="bg-emerald-100 text-emerald-950 px-2 py-0.5 rounded-full text-[10px] font-mono font-black ml-1">
+              Wallet
+              <span className="bg-emerald-100 text-emerald-950 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ml-0.5">
                 ₦{(profile?.balance ?? 50000).toLocaleString()}
               </span>
             </button>
@@ -885,6 +1019,144 @@ export default function RiderPanel({
             {/* Payment & Book CTA */}
             {origin && destination && (
               <div className="space-y-3 pt-2">
+                {/* Pickup Timing Toggle */}
+                <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-zinc-900">
+                      <Clock size={15} className="text-emerald-700" />
+                      <span>Pickup Schedule</span>
+                    </div>
+                    <div className="flex bg-[#E5DFD3] p-0.5 rounded-lg text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingTiming('now');
+                          setScheduleSuccessMsg(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                          bookingTiming === 'now' ? 'bg-zinc-900 text-white shadow-2xs' : 'text-zinc-700 hover:text-zinc-900'
+                        }`}
+                        id="timing-toggle-now"
+                      >
+                        ⚡ Ride Now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingTiming('schedule');
+                          setScheduleSuccessMsg(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
+                          bookingTiming === 'schedule' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-zinc-700 hover:text-zinc-900'
+                        }`}
+                        id="timing-toggle-schedule"
+                      >
+                        <CalendarClock size={12} /> Schedule
+                      </button>
+                    </div>
+                  </div>
+
+                  {bookingTiming === 'schedule' && (
+                    <div className="space-y-3 pt-2 border-t border-[#E5DFD3]">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">Pickup Date</label>
+                          <input
+                            type="date"
+                            min={new Date().toISOString().split('T')[0]}
+                            value={scheduledDate}
+                            onChange={(e) => setScheduledDate(e.target.value)}
+                            className="w-full bg-white border border-[#E5DFD3] rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                            id="scheduled-date-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">Pickup Time</label>
+                          <input
+                            type="time"
+                            value={scheduledTime}
+                            onChange={(e) => setScheduledTime(e.target.value)}
+                            className="w-full bg-white border border-[#E5DFD3] rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                            id="scheduled-time-input"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + 1);
+                            setScheduledDate(d.toISOString().split('T')[0]);
+                            setScheduledTime('08:00');
+                          }}
+                          className="text-[10px] bg-white border border-[#E5DFD3] hover:bg-[#F2EDE4] px-2 py-1 rounded-md font-bold text-zinc-700 shrink-0 cursor-pointer"
+                        >
+                          Tomorrow 8:00 AM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + 1);
+                            setScheduledDate(d.toISOString().split('T')[0]);
+                            setScheduledTime('17:30');
+                          }}
+                          className="text-[10px] bg-white border border-[#E5DFD3] hover:bg-[#F2EDE4] px-2 py-1 rounded-md font-bold text-zinc-700 shrink-0 cursor-pointer"
+                        >
+                          Tomorrow 5:30 PM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + 2);
+                            setScheduledDate(d.toISOString().split('T')[0]);
+                            setScheduledTime('09:00');
+                          }}
+                          className="text-[10px] bg-white border border-[#E5DFD3] hover:bg-[#F2EDE4] px-2 py-1 rounded-md font-bold text-zinc-700 shrink-0 cursor-pointer"
+                        >
+                          In 2 Days
+                        </button>
+                      </div>
+
+                      {/* Notes / Special Instructions */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">Notes for Driver (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Airport terminal, extra luggage space needed"
+                          value={scheduledNote}
+                          onChange={(e) => setScheduledNote(e.target.value)}
+                          className="w-full bg-white border border-[#E5DFD3] rounded-lg px-2.5 py-1.5 text-xs text-zinc-900 font-medium outline-none focus:border-zinc-900"
+                          id="scheduled-note-input"
+                        />
+                      </div>
+
+                      {scheduleSuccessMsg && (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-bold space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                            <span>{scheduleSuccessMsg}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveRiderSubTab('scheduled');
+                              setScheduleSuccessMsg(null);
+                            }}
+                            className="text-[10px] underline font-black text-emerald-800 hover:text-emerald-950 cursor-pointer block pt-0.5"
+                          >
+                            View Scheduled Pickups ({scheduledRides.length}) →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-zinc-800">
@@ -917,14 +1189,27 @@ export default function RiderPanel({
                   )}
                 </div>
 
-                <button
-                  onClick={handleBookingSubmit}
-                  className="w-full bg-zinc-900 text-white font-extrabold py-3.5 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
-                  id="book-uber-ride-btn"
-                >
-                  Book {VEHICLE_CONFIGS.find((v) => v.id === selectedVehicle)?.name || 'ZamTaxi Green'}
-                  <ArrowRight size={16} />
-                </button>
+                {bookingTiming === 'schedule' ? (
+                  <button
+                    type="button"
+                    onClick={handleScheduleRideSubmit}
+                    className="w-full bg-emerald-700 text-white font-extrabold py-3.5 rounded-xl hover:bg-emerald-800 transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
+                    id="schedule-ride-btn"
+                  >
+                    <CalendarClock size={16} />
+                    Schedule Pickup for {scheduledDate} @ {scheduledTime}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleBookingSubmit}
+                    className="w-full bg-zinc-900 text-white font-extrabold py-3.5 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
+                    id="book-uber-ride-btn"
+                  >
+                    Book {VEHICLE_CONFIGS.find((v) => v.id === selectedVehicle)?.name || 'ZamTaxi Green'}
+                    <ArrowRight size={16} />
+                  </button>
+                )}
               </div>
             )}
           </>
@@ -1439,6 +1724,220 @@ export default function RiderPanel({
         )}
 
         {/* ==========================================
+            STATE A3: SCHEDULED RIDES MANAGER VIEW
+           ========================================== */}
+        {!trip && activeRiderSubTab === 'scheduled' && (
+          <div className="space-y-4 py-1">
+            {/* HERO BANNER */}
+            <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 text-white p-5 rounded-2xl border border-emerald-500/30 shadow-xl space-y-3 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                    <CalendarClock size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                      Scheduled Pickups
+                    </h3>
+                    <p className="text-[11px] text-zinc-300 font-medium">
+                      Guaranteed driver assignment for upcoming rides
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveRiderSubTab('booking');
+                    setBookingTiming('schedule');
+                  }}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1 shadow-md cursor-pointer shrink-0"
+                  id="schedule-new-ride-btn"
+                >
+                  <Plus size={14} /> Schedule Ride
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800 text-center">
+                <div className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800">
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase block">Active Bookings</span>
+                  <span className="text-sm font-black text-emerald-400">
+                    {scheduledRides.filter((r) => r.status === 'SCHEDULED').length}
+                  </span>
+                </div>
+                <div className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800">
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase block">Total Pre-booked</span>
+                  <span className="text-sm font-black text-white">{scheduledRides.length}</span>
+                </div>
+                <div className="bg-zinc-900/80 p-2 rounded-xl border border-zinc-800">
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase block">Guaranteed SLA</span>
+                  <span className="text-sm font-black text-amber-300">100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* LIST OF SCHEDULED RIDES */}
+            {scheduledRides.length === 0 ? (
+              <div className="py-10 text-center border-2 border-dashed border-[#E5DFD3] bg-[#FAF7F2]/60 rounded-2xl space-y-3">
+                <CalendarClock size={36} className="mx-auto text-zinc-400" />
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-zinc-900">No Scheduled Rides Found</h4>
+                  <p className="text-xs text-zinc-600 max-w-[260px] mx-auto font-medium">
+                    Plan your travel ahead of time! Reserve rides for airport runs, lectures, or inter-state trips.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveRiderSubTab('booking');
+                    setBookingTiming('schedule');
+                  }}
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold px-4 py-2 rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Plus size={14} /> Schedule a Pickup Now
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-700 px-1">
+                  <span>Your Scheduled Itineraries</span>
+                  <span className="text-zinc-500 font-semibold">{scheduledRides.length} Rides Total</span>
+                </div>
+
+                <div className="space-y-3">
+                  {scheduledRides.map((ride) => {
+                    const isUpcoming = ride.status === 'SCHEDULED';
+                    const isDispatched = ride.status === 'DISPATCHED';
+                    const isCancelled = ride.status === 'CANCELLED';
+
+                    return (
+                      <div
+                        key={ride.id}
+                        className={`bg-white border rounded-2xl p-4 space-y-3 transition shadow-xs ${
+                          isUpcoming
+                            ? 'border-emerald-200 ring-1 ring-emerald-500/20'
+                            : isDispatched
+                            ? 'border-blue-200'
+                            : 'border-zinc-200 opacity-75'
+                        }`}
+                      >
+                        {/* Header status bar */}
+                        <div className="flex items-center justify-between border-b border-[#F2EDE4] pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center gap-1.5">
+                              <Calendar size={14} className="text-emerald-700" />
+                              <span>{ride.scheduledDate} @ {ride.scheduledTime}</span>
+                            </div>
+                            {ride.travelMode === 'interstate' && (
+                              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                                Out of State
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            {isUpcoming && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                                Scheduled
+                              </span>
+                            )}
+                            {isDispatched && (
+                              <span className="text-[10px] bg-blue-100 text-blue-900 border border-blue-300 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                                Dispatched
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="text-[10px] bg-rose-100 text-rose-900 border border-rose-300 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                                Cancelled
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Route details */}
+                        <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-2 relative">
+                          <div className="absolute left-5 top-5 bottom-5 w-0.5 bg-[#E5DFD3]" />
+
+                          <div className="flex items-center gap-2.5 relative z-10">
+                            <div className="w-4 h-4 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[9px] uppercase font-extrabold text-zinc-500 block">Pickup Landmark</span>
+                              <span className="text-xs font-black text-zinc-900 truncate block">{ride.origin.label}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 relative z-10">
+                            <div className="w-4 h-4 rounded-full bg-rose-600 flex items-center justify-center shrink-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[9px] uppercase font-extrabold text-zinc-500 block">Drop-off Landmark</span>
+                              <span className="text-xs font-black text-zinc-900 truncate block">{ride.destination.label}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ride Specs & Price */}
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <div className="flex items-center gap-2 text-zinc-700 font-semibold">
+                            <span className="bg-[#F2EDE4] px-2 py-1 rounded-md text-[11px] font-bold text-zinc-800">
+                              {VEHICLE_CONFIGS.find((v) => v.id === ride.vehicleType)?.name || 'ZamTaxi Green'}
+                            </span>
+                            {ride.notes && (
+                              <span className="text-[11px] text-zinc-500 truncate max-w-[160px] italic">
+                                "{ride.notes}"
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase block">Est. Fare</span>
+                            <span className="text-sm font-black text-emerald-800">₦{(ride.estimatedPrice || 3500).toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Card Action buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#F2EDE4]">
+                          {isUpcoming && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleCancelScheduledRide(ride.id)}
+                                className="px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-extrabold transition cursor-pointer"
+                              >
+                                Cancel Schedule
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDispatchScheduledRide(ride)}
+                                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                              >
+                                <Play size={12} fill="white" /> Dispatch Now
+                              </button>
+                            </>
+                          )}
+
+                          {(isCancelled || isDispatched) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteScheduledRide(ride.id)}
+                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==========================================
             STATE B: ACTIVE BOOKING - SEARCHING MATCH
            ========================================== */}
         {trip && trip.status === 'SEARCHING' && (
@@ -1886,6 +2385,19 @@ export default function RiderPanel({
                 id="driver-feedback-textarea"
               />
             </div>
+
+            {/* Replay Route Animation Button */}
+            {onReplayTrip && (
+              <button
+                type="button"
+                onClick={() => onReplayTrip(trip)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl transition flex items-center justify-center gap-2 text-xs shadow-md cursor-pointer border border-emerald-500"
+                id="replay-route-completed-trip-btn"
+              >
+                <Play size={15} className="fill-white" />
+                <span>Replay Route Animation on Map</span>
+              </button>
+            )}
 
             <button
               onClick={() => {

@@ -255,8 +255,14 @@ export default function App() {
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
   const [isSurgeActive, setIsSurgeActive] = useState<boolean>(false);
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [replayingTrip, setReplayingTrip] = useState<Trip | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isDriverOnline, setIsDriverOnline] = useState<boolean>(false);
+
+  const handleReplayTrip = (tripToReplay: Trip) => {
+    setReplayingTrip(tripToReplay);
+    addAuditLog('SYSTEM', `Replaying animated route trajectory for Trip #${tripToReplay.id} (${tripToReplay.origin.label} → ${tripToReplay.destination.label})`);
+  };
 
   // Driver positions (used for driver mode navigation)
   const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
@@ -953,6 +959,7 @@ export default function App() {
                 isSurgeActive={isSurgeActive}
                 setIsSurgeActive={setIsSurgeActive}
                 currentCity={currentCity}
+                onReplayTrip={handleReplayTrip}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -987,6 +994,7 @@ export default function App() {
                 passengers={passengers}
                 setPassengers={setPassengers}
                 addAuditLog={addAuditLog}
+                onReplayTrip={handleReplayTrip}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -1010,6 +1018,7 @@ export default function App() {
                 setExistingTrip={setTrip}
                 isDriverOnline={isDriverOnline}
                 setIsDriverOnline={setIsDriverOnline}
+                onReplayTrip={handleReplayTrip}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -1075,6 +1084,8 @@ export default function App() {
             driverPosition={driverPosition}
             roamingCars={roamingCars}
             travelMode={travelMode}
+            replayingTrip={replayingTrip}
+            onStopReplay={() => setReplayingTrip(null)}
           />
         </div>
       </main>

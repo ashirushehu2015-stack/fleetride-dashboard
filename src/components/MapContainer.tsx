@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Location, Trip, TripStatus } from '../types';
-import { MapPin, Navigation, Car, AlertCircle, Info } from 'lucide-react';
+import { MapPin, Navigation, Car, AlertCircle, Info, Play, Pause, RotateCcw, X, FastForward, Activity, Radio, RefreshCw } from 'lucide-react';
 import { CITIES } from '../data';
 
-interface MapContainerProps {
+export interface MapContainerProps {
   city: {
     id: string;
     name: string;
@@ -21,6 +21,8 @@ interface MapContainerProps {
   driverPosition: { lat: number; lng: number } | null;
   roamingCars: { id: string; lat: number; lng: number; angle: number; type: string }[];
   travelMode: 'municipal' | 'interstate';
+  replayingTrip?: Trip | null;
+  onStopReplay?: () => void;
 }
 
 const GOOGLE_MAPS_KEY =
@@ -31,14 +33,189 @@ const GOOGLE_MAPS_KEY =
 const hasValidKey = Boolean(GOOGLE_MAPS_KEY) && GOOGLE_MAPS_KEY !== 'YOUR_API_KEY';
 
 export default function MapContainer(props: MapContainerProps) {
+  const { replayingTrip, onStopReplay } = props;
+  const [replayProgress, setReplayProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
+
+  // Reset replay state whenever a new trip is replayed
+  useEffect(() => {
+    if (replayingTrip) {
+      setReplayProgress(0);
+      setIsPlaying(true);
+    }
+  }, [replayingTrip?.id]);
+
+  // Replay Animation Progress Ticker Loop
+  useEffect(() => {
+    if (!replayingTrip || !isPlaying) return;
+    const interval = setInterval(() => {
+      setReplayProgress((prev) => {
+        const next = prev + 0.007 * replaySpeed;
+        if (next >= 1) {
+          setIsPlaying(false);
+          return 1;
+        }
+        return next;
+      });
+    }, 30);
+    return () => clearInterval(interval);
+  }, [replayingTrip, isPlaying, replaySpeed]);
+
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-zinc-100 bg-zinc-900">
       {hasValidKey ? (
         <APIProvider apiKey={GOOGLE_MAPS_KEY} version="weekly">
-          <GoogleMapWrapper {...props} />
+          <GoogleMapWrapper
+            {...props}
+            replayProgress={replayingTrip ? replayProgress : undefined}
+          />
         </APIProvider>
       ) : (
-        <CanvasMapFallback {...props} />
+        <CanvasMapFallback
+          {...props}
+          replayProgress={replayingTrip ? replayProgress : undefined}
+        />
+      )}
+
+      {/* ==========================================
+          ROUTE REPLAY CONTROL HUD OVERLAY
+         ========================================== */}
+      {replayingTrip && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[92%] max-w-lg bg-zinc-950/95 border border-emerald-500/40 text-white rounded-2xl p-3.5 shadow-2xl z-30 backdrop-blur-md space-y-2.5 animate-fade-in">
+          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <Activity size={18} className={isPlaying ? 'animate-pulse' : ''} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
+                  ROUTE REPLAY ANIMATION
+                </span>
+                <h4 className="text-xs font-extrabold text-white truncate max-w-[260px]">
+                  {replayingTrip.origin.label} ➔ {replayingTrip.destination.label}
+                </h4>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (onStopReplay) onStopReplay();
+              }}
+              className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
+              title="Exit Replay"
+              id="close-route-replay-btn"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Replay Metadata Banner */}
+          <div className="flex items-center justify-between text-[11px] bg-zinc-900/90 p-2 rounded-xl border border-zinc-800/80 font-mono">
+            <div className="flex items-center gap-1.5 text-zinc-300 font-bold truncate">
+              <span>🚕 {replayingTrip.driver.vehicleName}</span>
+            </div>
+            <div className="flex items-center gap-2 text-zinc-300 shrink-0">
+              <span>{replayingTrip.distanceMiles} km</span>
+              <span>•</span>
+              <span>{replayingTrip.durationMinutes} mins</span>
+              <span>•</span>
+              <span className="text-emerald-400 font-extrabold">₦{replayingTrip.price.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Timeline Scrubbing Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] font-mono font-bold text-zinc-400">
+              <span className="flex items-center gap-1">
+                <span>Progress: {Math.round(replayProgress * 100)}%</span>
+              </span>
+              <span className="text-emerald-400 font-extrabold">
+                {replayProgress >= 1 ? '🏁 Route Completed' : isPlaying ? '▶ Tracing Path...' : '⏸ Paused'}
+              </span>
+            </div>
+            <div className="relative flex items-center">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                value={replayProgress}
+                onChange={(e) => {
+                  setReplayProgress(parseFloat(e.target.value));
+                  if (parseFloat(e.target.value) < 1 && !isPlaying) {
+                    setIsPlaying(true);
+                  }
+                }}
+                className="w-full accent-emerald-500 bg-zinc-800 rounded-lg h-2 cursor-pointer"
+                id="route-replay-progress-slider"
+              />
+            </div>
+          </div>
+
+          {/* Control Buttons */}
+          <div className="flex items-center justify-between pt-0.5">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (replayProgress >= 1) {
+                    setReplayProgress(0);
+                    setIsPlaying(true);
+                  } else {
+                    setIsPlaying(!isPlaying);
+                  }
+                }}
+                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                id="toggle-replay-play-pause-btn"
+              >
+                {replayProgress >= 1 ? (
+                  <>
+                    <RotateCcw size={14} /> Replay Again
+                  </>
+                ) : isPlaying ? (
+                  <>
+                    <Pause size={14} /> Pause
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} /> Play
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setReplayProgress(0);
+                  setIsPlaying(true);
+                }}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Restart Replay"
+                id="restart-route-replay-btn"
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            </div>
+
+            {/* Speed Multipliers */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-zinc-400 font-mono font-bold mr-1">Speed:</span>
+              <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 text-[10px] font-mono font-bold">
+                {[1, 2, 4].map((spd) => (
+                  <button
+                    key={spd}
+                    onClick={() => setReplaySpeed(spd as 1 | 2 | 4)}
+                    className={`px-2 py-0.5 rounded-lg transition cursor-pointer ${
+                      replaySpeed === spd ? 'bg-emerald-500 text-zinc-950 font-extrabold' : 'text-zinc-400 hover:text-white'
+                    }`}
+                    id={`replay-speed-${spd}x-btn`}
+                  >
+                    {spd}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -49,15 +226,20 @@ export default function MapContainer(props: MapContainerProps) {
 // ==========================================
 function GoogleMapWrapper({
   city,
-  origin,
-  destination,
+  origin: initialOrigin,
+  destination: initialDestination,
   trip,
   isDriverMode,
   driverPosition,
   roamingCars,
   travelMode,
-}: MapContainerProps) {
+  replayingTrip,
+  replayProgress,
+}: MapContainerProps & { replayProgress?: number }) {
   const [mapCenter, setMapCenter] = useState(city.center);
+
+  const activeOrigin = replayingTrip ? replayingTrip.origin : initialOrigin;
+  const activeDestination = replayingTrip ? replayingTrip.destination : initialDestination;
 
   useEffect(() => {
     if (travelMode === 'interstate') {
@@ -67,13 +249,12 @@ function GoogleMapWrapper({
     }
   }, [city, travelMode]);
 
-  // Keep track of the actual map instance to auto-fit
   return (
     <div className="w-full h-full relative">
       <Map
         defaultCenter={mapCenter}
         defaultZoom={travelMode === 'interstate' ? 6 : city.zoom}
-        center={trip ? undefined : mapCenter}
+        center={trip || replayingTrip ? undefined : mapCenter}
         mapId="UBER_SIMULATOR_MAP"
         internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
         style={{ width: '100%', height: '100%' }}
@@ -81,21 +262,21 @@ function GoogleMapWrapper({
         disableDefaultUI={false}
       >
         {/* Origin Pin */}
-        {origin && (
-          <AdvancedMarker position={{ lat: origin.lat, lng: origin.lng }} title={`Pickup: ${origin.label}`}>
+        {activeOrigin && (
+          <AdvancedMarker position={{ lat: activeOrigin.lat, lng: activeOrigin.lng }} title={`Pickup: ${activeOrigin.label}`}>
             <Pin background="#22c55e" glyphColor="#fff" scale={1.1} />
           </AdvancedMarker>
         )}
 
         {/* Destination Pin */}
-        {destination && (
-          <AdvancedMarker position={{ lat: destination.lat, lng: destination.lng }} title={`Dropoff: ${destination.label}`}>
+        {activeDestination && (
+          <AdvancedMarker position={{ lat: activeDestination.lat, lng: activeDestination.lng }} title={`Dropoff: ${activeDestination.label}`}>
             <Pin background="#ef4444" glyphColor="#fff" scale={1.1} />
           </AdvancedMarker>
         )}
 
         {/* Active Driver Car (Rider Mode) */}
-        {trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED' && trip.status !== 'CANCELLED' && (
+        {trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED' && trip.status !== 'CANCELLED' && !replayingTrip && (
           <AdvancedMarker position={trip.currentPosition} title={`Driver: ${trip.driver.name}`}>
             <div className="bg-amber-400 border-2 border-zinc-900 text-zinc-950 p-2 rounded-full shadow-lg flex items-center justify-center animate-bounce">
               <Car size={18} className="fill-zinc-950" />
@@ -104,7 +285,7 @@ function GoogleMapWrapper({
         )}
 
         {/* Active Driver Car (Driver Mode) */}
-        {isDriverMode && driverPosition && (
+        {isDriverMode && driverPosition && !replayingTrip && (
           <AdvancedMarker position={driverPosition} title="Your Vehicle">
             <div className="bg-zinc-950 border-2 border-white text-white p-2 rounded-full shadow-lg flex items-center justify-center">
               <Navigation size={18} className="fill-white transform rotate-45" />
@@ -113,7 +294,7 @@ function GoogleMapWrapper({
         )}
 
         {/* Roaming Cars */}
-        {!trip && !isDriverMode && roamingCars.map((car) => (
+        {!trip && !replayingTrip && !isDriverMode && roamingCars.map((car) => (
           <AdvancedMarker key={car.id} position={{ lat: car.lat, lng: car.lng }} title="ZamTaxi Driver">
             <div className="bg-white border border-zinc-300 text-zinc-900 p-1.5 rounded-full shadow-md flex items-center justify-center opacity-85">
               <Car size={12} className="fill-zinc-800" />
@@ -122,8 +303,14 @@ function GoogleMapWrapper({
         ))}
 
         {/* Google Maps Route Renderer */}
-        {(origin && destination) && (
-          <GoogleRouteRenderer origin={origin} destination={destination} trip={trip} />
+        {(activeOrigin && activeDestination) && (
+          <GoogleRouteRenderer
+            origin={activeOrigin}
+            destination={activeDestination}
+            trip={trip}
+            replayingTrip={replayingTrip}
+            replayProgress={replayProgress}
+          />
         )}
       </Map>
 
@@ -140,10 +327,14 @@ function GoogleRouteRenderer({
   origin,
   destination,
   trip,
+  replayingTrip,
+  replayProgress,
 }: {
   origin: Location;
   destination: Location;
   trip: Trip | null;
+  replayingTrip?: Trip | null;
+  replayProgress?: number;
 }) {
   const map = useMap();
   const routesLib = useMapsLibrary('routes');
@@ -167,22 +358,21 @@ function GoogleRouteRenderer({
     })
       .then(({ routes }) => {
         if (routes?.[0]) {
+          const baseColor = replayingTrip ? '#10b981' : '#3b82f6';
           const newPolylines = routes[0].createPolylines();
           newPolylines.forEach((p) => {
             p.setOptions({
-              strokeColor: '#3b82f6',
-              strokeOpacity: 0.8,
-              strokeWeight: 5,
+              strokeColor: baseColor,
+              strokeOpacity: 0.9,
+              strokeWeight: 6,
             });
             p.setMap(map);
           });
           polylinesRef.current = newPolylines;
 
-          // Adjust map viewport to cover the route if not currently playing a trip
-          if (!trip || trip.status === 'SEARCHING') {
-            if (routes[0].viewport) {
-              map.fitBounds(routes[0].viewport);
-            }
+          // Adjust map viewport to cover the route
+          if (routes[0].viewport) {
+            map.fitBounds(routes[0].viewport);
           }
         }
       })
@@ -194,7 +384,7 @@ function GoogleRouteRenderer({
       polylinesRef.current.forEach((p) => p.setMap(null));
       polylinesRef.current = [];
     };
-  }, [routesLib, map, origin, destination, trip?.id]);
+  }, [routesLib, map, origin, destination, trip?.id, replayingTrip?.id]);
 
   return null;
 }
@@ -230,8 +420,8 @@ const NIGERIA_BORDER = [
 
 function CanvasMapFallback({
   city,
-  origin,
-  destination,
+  origin: initialOrigin,
+  destination: initialDestination,
   setOrigin,
   setDestination,
   trip,
@@ -239,11 +429,16 @@ function CanvasMapFallback({
   driverPosition,
   roamingCars,
   travelMode,
-}: MapContainerProps) {
+  replayingTrip,
+  replayProgress,
+}: MapContainerProps & { replayProgress?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredLandmark, setHoveredLandmark] = useState<number | null>(null);
+
+  const origin = replayingTrip ? replayingTrip.origin : initialOrigin;
+  const destination = replayingTrip ? replayingTrip.destination : initialDestination;
 
   // Resize listener using ResizeObserver to avoid hardcoded layout sizes
   useEffect(() => {
@@ -441,10 +636,10 @@ function CanvasMapFallback({
       const origPt = project(origin.lat, origin.lng);
       const destPt = project(destination.lat, destination.lng);
 
-      // Draw glowing blue path
-      ctx.shadowColor = '#3b82f6';
+      // Draw glowing blue path for static view
+      ctx.shadowColor = replayingTrip ? '#065f46' : '#3b82f6';
       ctx.shadowBlur = 12;
-      ctx.strokeStyle = '#3b82f6'; // blue-500
+      ctx.strokeStyle = replayingTrip ? 'rgba(16, 185, 129, 0.3)' : '#3b82f6'; // blue-500 / dim emerald
       ctx.lineWidth = 5;
 
       ctx.beginPath();
@@ -462,7 +657,7 @@ function CanvasMapFallback({
         ctx.shadowColor = 'transparent';
 
         // Draw progress overlay if a trip is running
-        if (trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED') {
+        if (trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED' && !replayingTrip) {
           ctx.strokeStyle = '#e11d48'; // rose-600 indicator
           ctx.lineWidth = 2.5;
           ctx.setLineDash([6, 6]);
@@ -485,7 +680,7 @@ function CanvasMapFallback({
         ctx.shadowColor = 'transparent';
 
         // Draw dotted active progress overlay if a trip is running
-        if (trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED') {
+        if (trip && trip.status !== 'IDLE' && trip.status !== 'COMPLETED' && !replayingTrip) {
           ctx.strokeStyle = '#e11d48'; // rose-600 indicator
           ctx.lineWidth = 2;
           ctx.setLineDash([6, 6]);
@@ -497,6 +692,107 @@ function CanvasMapFallback({
           ctx.setLineDash([]); // reset
         }
       }
+    }
+
+    // 3b. Draw Route Replay Polyline Animation (if replayingTrip is active)
+    if (replayingTrip && origin && destination && replayProgress !== undefined) {
+      const origPt = project(origin.lat, origin.lng);
+      const destPt = project(destination.lat, destination.lng);
+
+      // Compute current car position and traced path along the polyline
+      let carPt = { x: origPt.x, y: origPt.y };
+
+      if (isInterstate) {
+        const midX = (origPt.x + destPt.x) / 2;
+        const midY = (origPt.y + destPt.y) / 2 - Math.abs(origPt.x - destPt.x) * 0.15;
+
+        // Draw animated glowing emerald traced route polyline up to replayProgress
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+
+        const steps = Math.max(2, Math.floor(replayProgress * 50));
+        for (let i = 0; i <= steps; i++) {
+          const t = (i / 50);
+          const x = (1 - t) * (1 - t) * origPt.x + 2 * (1 - t) * t * midX + t * t * destPt.x;
+          const y = (1 - t) * (1 - t) * origPt.y + 2 * (1 - t) * t * midY + t * t * destPt.y;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          if (i === steps) carPt = { x, y };
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+      } else {
+        const midX = origPt.x;
+        const midY = destPt.y;
+
+        const leg1Dist = Math.hypot(midX - origPt.x, midY - origPt.y);
+        const leg2Dist = Math.hypot(destPt.x - midX, destPt.y - midY);
+        const totalDist = leg1Dist + leg2Dist || 1;
+        const ratio1 = leg1Dist / totalDist;
+
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(origPt.x, origPt.y);
+
+        if (replayProgress <= ratio1) {
+          const t = replayProgress / (ratio1 || 1);
+          carPt = {
+            x: origPt.x + (midX - origPt.x) * t,
+            y: origPt.y + (midY - origPt.y) * t,
+          };
+          ctx.lineTo(carPt.x, carPt.y);
+        } else {
+          const t = (replayProgress - ratio1) / ((1 - ratio1) || 1);
+          carPt = {
+            x: midX + (destPt.x - midX) * t,
+            y: midY + (destPt.y - midY) * t,
+          };
+          ctx.lineTo(midX, midY);
+          ctx.lineTo(carPt.x, carPt.y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+      }
+
+      // Draw Vehicle Badge at carPt during Replay
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(carPt.x, carPt.y, 18 + Math.sin(Date.now() / 90) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#10b981';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(carPt.x, carPt.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🚕', carPt.x, carPt.y);
+
+      // Label floating above vehicle
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(carPt.x - 45, carPt.y - 32, 90, 18);
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(carPt.x - 45, carPt.y - 32, 90, 18);
+
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 10px system-ui, sans-serif';
+      ctx.fillText('TRACING ROUTE', carPt.x, carPt.y - 23);
     }
 
     // 4. Draw Landmarks (POIs) / Cities
