@@ -4,6 +4,8 @@ import {
   Area,
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -102,23 +104,64 @@ export default function DashboardPanel({
     };
   }, [completedTrips]);
 
-  // 2. Aggregate Chart Data: Day-by-Day Revenue and Bookings
+  // 2. Aggregate Chart Data: Day-by-Day Revenue, User Contribution, and Average Fare
   const chartData = useMemo(() => {
-    // Distribute user-completed rides over the current day (Sun) or append to data
-    const updatedData = [...BASE_DAILY_DATA];
-    const userRevenue = completedTrips.reduce((acc, t) => acc + t.price, 0);
-    const userRides = completedTrips.length;
-    const userMoto = completedTrips.filter(t => (t.vehicleType as any) === 'Moto').length;
-
-    // Add real-time completed rides to the weekend metrics
-    updatedData[updatedData.length - 1] = {
-      ...updatedData[updatedData.length - 1],
-      revenue: updatedData[updatedData.length - 1].revenue + Math.round(userRevenue),
-      rides: updatedData[updatedData.length - 1].rides + userRides,
-      moto: updatedData[updatedData.length - 1].moto + userMoto
+    const DAY_MAP: Record<number, string> = {
+      0: 'Sun',
+      1: 'Mon',
+      2: 'Tue',
+      3: 'Wed',
+      4: 'Thu',
+      5: 'Fri',
+      6: 'Sat'
     };
 
-    return updatedData;
+    // Initialize baseline map for 7 days
+    const dayMap = new Map<
+      string,
+      {
+        day: string;
+        baseRevenue: number;
+        userRevenue: number;
+        revenue: number;
+        rides: number;
+        userRides: number;
+        avgFare: number;
+      }
+    >();
+
+    BASE_DAILY_DATA.forEach((d) => {
+      dayMap.set(d.day, {
+        day: d.day,
+        baseRevenue: d.revenue,
+        userRevenue: 0,
+        revenue: d.revenue,
+        rides: d.rides,
+        userRides: 0,
+        avgFare: Math.round(d.revenue / Math.max(1, d.rides))
+      });
+    });
+
+    // Accumulate actual user completed trips dynamically by timestamp day of week
+    completedTrips.forEach((trip) => {
+      let dayName = 'Sun';
+      if (trip.timestamp) {
+        const date = new Date(trip.timestamp);
+        if (!isNaN(date.getTime())) {
+          dayName = DAY_MAP[date.getDay()] || 'Sun';
+        }
+      }
+      const existing = dayMap.get(dayName);
+      if (existing) {
+        existing.userRevenue += trip.price;
+        existing.revenue += Math.round(trip.price);
+        existing.rides += 1;
+        existing.userRides += 1;
+        existing.avgFare = Math.round(existing.revenue / Math.max(1, existing.rides));
+      }
+    });
+
+    return Array.from(dayMap.values());
   }, [completedTrips]);
 
   // 3. Aggregate Vehicle Type Breakdown
@@ -353,48 +396,224 @@ export default function DashboardPanel({
           </button>
         </div>
 
-        {/* SECTION 3: RECHARTS GRAPHICAL TREND */}
-        <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4">
-          <div className="flex items-center justify-between mb-4">
+        {/* SECTION 3: RECHARTS DAILY REVENUE TREND & ANALYTICS */}
+        <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-4 text-left shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5DFD3] pb-3">
             <div>
-              <h4 className="font-extrabold text-xs text-zinc-900">
-                {activeMetric === 'revenue' ? 'Revenue Generation Index' : 'Daily Trip Volume Distribution'}
-              </h4>
-              <p className="text-[10px] text-zinc-600 font-medium">Weekly breakdown including real-time simulation updates</p>
+              <div className="flex items-center gap-1.5">
+                <TrendingUp size={15} className="text-emerald-700" />
+                <h4 className="font-extrabold text-xs text-zinc-900">
+                  Daily Revenue Trends & Ride Analytics
+                </h4>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-medium">
+                Live weekly revenue performance calculated from real-time completed trips
+              </p>
             </div>
-            <span className="text-[10px] bg-white border border-[#E5DFD3] px-2.5 py-1 rounded-full font-mono text-zinc-800 font-bold">
-              7-Day Cycle
-            </span>
+
+            {/* View Mode Selector Tabs */}
+            <div className="flex items-center bg-white border border-[#E5DFD3] rounded-lg p-0.5 text-[10px] font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveMetric('revenue')}
+                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                  activeMetric === 'revenue'
+                    ? 'bg-emerald-700 text-white shadow-2xs font-extrabold'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+                id="tab-view-revenue-trend"
+              >
+                Revenue Area
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMetric('rides')}
+                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                  activeMetric === 'rides'
+                    ? 'bg-emerald-700 text-white shadow-2xs font-extrabold'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+                id="tab-view-composed-trend"
+              >
+                Revenue & Avg Fare
+              </button>
+            </div>
           </div>
 
-          <div className="h-[220px] w-full">
+          {/* Recharts Container */}
+          <div className="h-[230px] w-full pt-1">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={activeMetric === 'revenue' ? '#047857' : '#0284c7'} stopOpacity={0.25}/>
-                    <stop offset="95%" stopColor={activeMetric === 'revenue' ? '#047857' : '#0284c7'} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5DFD3" />
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#18181b', borderRadius: '8px', border: 'none', color: '#fff' }}
-                  labelStyle={{ fontWeight: 'bold', fontSize: '11px', color: '#a1a1aa' }}
-                  itemStyle={{ fontSize: '12px' }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey={activeMetric}
-                  name={activeMetric === 'revenue' ? 'Revenue (₦)' : 'Trips Completed'}
-                  stroke={activeMetric === 'revenue' ? '#047857' : '#0284c7'}
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#colorMetric)"
-                />
-              </AreaChart>
+              {activeMetric === 'revenue' ? (
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#047857" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#047857" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="colorUserRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5DFD3" />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={(val) => `₦${(val / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl shadow-2xl text-xs space-y-1.5 font-sans">
+                            <div className="font-extrabold text-emerald-400 text-xs border-b border-zinc-800 pb-1 flex items-center justify-between gap-4">
+                              <span>{label}day Revenue Trend</span>
+                              <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+                                ₦{data.revenue.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4 text-zinc-300 text-[11px]">
+                              <span>Base Revenue:</span>
+                              <span className="font-mono font-bold">₦{data.baseRevenue.toLocaleString()}</span>
+                            </div>
+                            {data.userRevenue > 0 && (
+                              <div className="flex justify-between items-center gap-4 text-emerald-400 text-[11px] font-semibold">
+                                <span>Real User Rides:</span>
+                                <span className="font-mono font-bold">+₦{data.userRevenue.toLocaleString()} ({data.userRides} rides)</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between items-center gap-4 text-zinc-400 text-[11px]">
+                              <span>Total Daily Trips:</span>
+                              <span className="font-mono font-bold text-zinc-200">{data.rides} rides</span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4 text-amber-400 text-[11px]">
+                              <span>Avg Fare / Trip:</span>
+                              <span className="font-mono font-bold">₦{data.avgFare.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Gross Daily Revenue (₦)"
+                    stroke="#047857"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorRevenue)"
+                  />
+                </AreaChart>
+              ) : (
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5DFD3" />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tickFormatter={(val) => `₦${(val / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 10, fill: '#3f3f46', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tickFormatter={(val) => `₦${val}`}
+                    tick={{ fontSize: 9, fill: '#0284c7', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl shadow-2xl text-xs space-y-1.5">
+                            <div className="font-extrabold text-sky-400 text-xs border-b border-zinc-800 pb-1">
+                              {label}day Metric Breakdown
+                            </div>
+                            <div className="flex justify-between items-center gap-4 text-zinc-300 text-[11px]">
+                              <span>Daily Revenue:</span>
+                              <span className="font-mono font-bold text-emerald-400">₦{data.revenue.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4 text-sky-300 text-[11px]">
+                              <span>Avg Fare per Ride:</span>
+                              <span className="font-mono font-bold">₦{data.avgFare.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center gap-4 text-zinc-400 text-[11px]">
+                              <span>Trips Completed:</span>
+                              <span className="font-mono font-bold text-zinc-200">{data.rides} rides</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="revenue"
+                    name="Daily Revenue (₦)"
+                    fill="#18181b"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={32}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-bar-${index}`}
+                        fill={entry.userRevenue > 0 ? '#047857' : '#27272a'}
+                      />
+                    ))}
+                  </Bar>
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgFare"
+                    name="Avg Fare (₦)"
+                    stroke="#0284c7"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: '#0284c7' }}
+                  />
+                </ComposedChart>
+              )}
             </ResponsiveContainer>
+          </div>
+
+          {/* Day-by-Day Daily Revenue Cards Summary */}
+          <div className="grid grid-cols-7 gap-1.5 pt-2 border-t border-[#E5DFD3]">
+            {chartData.map((d) => (
+              <div
+                key={d.day}
+                className={`p-2 rounded-lg text-center border transition ${
+                  d.userRevenue > 0
+                    ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
+                    : 'bg-white border-[#E5DFD3]'
+                }`}
+              >
+                <div className="text-[10px] font-extrabold text-zinc-900">{d.day}</div>
+                <div className="text-[10px] font-mono font-black text-emerald-800 mt-0.5 truncate">
+                  ₦{(d.revenue / 1000).toFixed(0)}k
+                </div>
+                <div className="text-[8px] font-mono font-bold text-zinc-500 mt-0.5">
+                  {d.rides} rides
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
