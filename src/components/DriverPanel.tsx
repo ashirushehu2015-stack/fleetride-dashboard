@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import VoiceCallModal from './VoiceCallModal';
 import { UserProfile, Location, Trip } from '../types';
 import { MOCK_PASSENGERS } from '../data';
 import {
@@ -15,7 +16,10 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  Star
+  Star,
+  Phone,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 
 interface DriverPanelProps {
@@ -75,6 +79,12 @@ export default function DriverPanel({
   const [activeTrip, setActiveTrip] = useState<SimulatedOffer | null>(null);
   const [driveProgress, setDriveProgress] = useState<number>(0);
   const [recentEarnings, setRecentEarnings] = useState<number>(0);
+  const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
+  const [showDriverChat, setShowDriverChat] = useState<boolean>(false);
+  const [driverChatInput, setDriverChatInput] = useState<string>('');
+  const [driverMessages, setDriverMessages] = useState<Array<{ id: string; sender: 'driver' | 'rider'; text: string; time: string }>>([
+    { id: '1', sender: 'rider', text: "Hello driver, I'm waiting at the pickup spot!", time: 'Just now' }
+  ]);
 
   // Synchronize isOnline state with parent App.tsx so it knows a driver is online
   useEffect(() => {
@@ -570,6 +580,124 @@ export default function DriverPanel({
               </div>
             </div>
 
+            {/* Passenger Contact & Communication Card */}
+            <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E5DFD3] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={activeTrip.passengerAvatar}
+                    alt={activeTrip.passengerName}
+                    className="w-10 h-10 rounded-full object-cover border border-[#E5DFD3]"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <h5 className="font-extrabold text-xs text-zinc-900">{activeTrip.passengerName}</h5>
+                    <div className="flex items-center gap-1 text-[11px] text-zinc-600 font-semibold">
+                      <Star size={11} className="text-amber-500 fill-amber-500" />
+                      <span>{activeTrip.passengerRating.toFixed(1)} Passenger</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowDriverChat(!showDriverChat)}
+                    className="p-2 bg-white hover:bg-zinc-100 border border-[#E5DFD3] rounded-lg text-zinc-900 transition cursor-pointer"
+                    title="Chat Passenger"
+                    id="driver-chat-passenger-btn"
+                  >
+                    <MessageSquare size={15} />
+                  </button>
+                  <button
+                    onClick={() => setIsVoiceCallOpen(true)}
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    id="driver-call-passenger-btn"
+                  >
+                    <Phone size={13} /> Call Passenger
+                  </button>
+                </div>
+              </div>
+
+              {/* Driver-Passenger Chat Box */}
+              {showDriverChat && (
+                <div className="bg-white rounded-xl border border-[#E5DFD3] overflow-hidden text-xs space-y-2 p-3 mt-2 shadow-sm">
+                  <div className="flex items-center justify-between font-bold border-b border-zinc-100 pb-1.5 text-zinc-800">
+                    <span>Chatting with {activeTrip.passengerName}</span>
+                    <button onClick={() => setShowDriverChat(false)} className="text-zinc-400 hover:text-zinc-900">
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 py-1">
+                    {driverMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`flex ${m.sender === 'driver' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[85%] px-2.5 py-1.5 rounded-lg text-[11px] font-medium ${
+                            m.sender === 'driver'
+                              ? 'bg-zinc-900 text-white'
+                              : 'bg-zinc-100 text-zinc-800 border border-zinc-200'
+                          }`}
+                        >
+                          {m.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Driver Quick Reply Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                    {[
+                      "I've arrived at pickup point 📍",
+                      "I'm in traffic, 2 mins away ⏱️",
+                      "Where are you standing? 🔍",
+                      "I'm outside in the blue car 🚘"
+                    ].map((pill, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setDriverMessages((prev) => [
+                            ...prev,
+                            { id: Date.now().toString(), sender: 'driver', text: pill, time: 'Just now' }
+                          ]);
+                        }}
+                        className="shrink-0 px-2 py-0.5 bg-zinc-50 hover:bg-zinc-200 border border-zinc-200 rounded-full text-[10px] font-bold text-zinc-700"
+                      >
+                        {pill}
+                      </button>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!driverChatInput.trim()) return;
+                      setDriverMessages((prev) => [
+                        ...prev,
+                        { id: Date.now().toString(), sender: 'driver', text: driverChatInput.trim(), time: 'Just now' }
+                      ]);
+                      setDriverChatInput('');
+                    }}
+                    className="flex gap-1.5 pt-1"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Type reply..."
+                      value={driverChatInput}
+                      onChange={(e) => setDriverChatInput(e.target.value)}
+                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-1 text-[11px] outline-none font-medium"
+                    />
+                    <button type="submit" className="bg-zinc-900 text-white px-2.5 py-1 rounded-lg text-xs">
+                      <Send size={12} />
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+
             {/* Drive Simulation controller - Manual steps or Auto-Tick triggers */}
             <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] text-center space-y-3">
               <h4 className="text-xs font-extrabold text-zinc-900">Trip Progression Trigger</h4>
@@ -654,6 +782,25 @@ export default function DriverPanel({
       <div className="bg-[#FAF7F2] p-2.5 text-center text-[10px] text-zinc-600 border-t border-[#E5DFD3] flex items-center justify-center gap-1 font-mono font-semibold">
         <span>Instant Cashout synced with Stripe Express</span>
       </div>
+
+      {/* Driver VoIP Call Modal */}
+      {activeTrip && (
+        <VoiceCallModal
+          isOpen={isVoiceCallOpen}
+          onClose={() => setIsVoiceCallOpen(false)}
+          callerName={activeTrip.passengerName}
+          callerAvatar={activeTrip.passengerAvatar}
+          callerRole="Passenger"
+          phoneNumber="+234 803 123 4567"
+          onSendQuickChat={(txt) => {
+            setDriverMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), sender: 'driver', text: txt, time: 'Just now' }
+            ]);
+            setShowDriverChat(true);
+          }}
+        />
+      )}
     </div>
   );
 }

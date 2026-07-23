@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import VoiceCallModal from './VoiceCallModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import {
@@ -93,6 +94,7 @@ export default function RiderPanel({
   const [reviewText, setReviewText] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
   const [showChat, setShowChat] = useState<boolean>(false);
+  const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Passenger Navigation & Wallet Sub-states
@@ -1552,25 +1554,24 @@ export default function RiderPanel({
                       <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     )}
                   </button>
-                  <a
-                    href={`tel:${trip.driver.phone}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert(`Simulating phone call to driver: ${trip.driver.phone}`);
-                    }}
-                    className="py-2 px-3 bg-white border border-[#E5DFD3] rounded-lg text-xs font-bold text-zinc-900 hover:bg-[#F2EDE4] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  <button
+                    onClick={() => setIsVoiceCallOpen(true)}
+                    className="py-2 px-3 bg-[#10B981] hover:bg-[#059669] text-white border border-[#059669] rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     id="call-driver-btn"
                   >
-                    <Phone size={14} /> Call Driver
-                  </a>
+                    <Phone size={14} /> Call Driver (VoIP)
+                  </button>
                 </div>
               </div>
 
               {/* Chat Interface Drawer/Overlay */}
               {showChat && (
-                <div className="bg-[#FAF7F2] rounded-xl border border-[#E5DFD3] overflow-hidden flex flex-col h-[280px]">
+                <div className="bg-[#FAF7F2] rounded-xl border border-[#E5DFD3] overflow-hidden flex flex-col h-[320px]">
                   <div className="p-2.5 bg-zinc-900 text-white flex items-center justify-between text-xs">
-                    <span className="font-bold">Chatting with {trip.driver.name}</span>
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Chatting with {trip.driver.name}
+                    </span>
                     <button
                       onClick={() => setShowChat(false)}
                       className="text-zinc-400 hover:text-white cursor-pointer"
@@ -1584,7 +1585,7 @@ export default function RiderPanel({
                   <div className="flex-1 p-3 overflow-y-auto space-y-2 text-xs">
                     {chatMessages.length === 0 ? (
                       <div className="text-center text-zinc-500 italic py-6">
-                        No messages yet. Send a greeting to your driver!
+                        No messages yet. Send a quick phrase to your driver below!
                       </div>
                     ) : (
                       chatMessages.map((msg) => {
@@ -1620,11 +1621,31 @@ export default function RiderPanel({
                     <div ref={chatEndRef} />
                   </div>
 
+                  {/* Quick Message Chips */}
+                  <div className="px-2 py-1.5 bg-[#FAF7F2] border-t border-[#E5DFD3] flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
+                    {[
+                      "I'm at the gate 🚪",
+                      "I have luggage 🧳",
+                      "Where are you? 📍",
+                      "Please hurry 🙏",
+                      "I'm wearing a black shirt 👕"
+                    ].map((quickText, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => onSendMessage(quickText)}
+                        className="shrink-0 px-2.5 py-1 bg-white hover:bg-zinc-900 hover:text-white border border-[#E5DFD3] rounded-full font-semibold text-zinc-800 transition cursor-pointer text-[10px]"
+                      >
+                        {quickText}
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Chat Form */}
                   <form onSubmit={handleSendChatMessage} className="p-2 bg-white border-t border-[#E5DFD3] flex gap-2">
                     <input
                       type="text"
-                      placeholder="Send message..."
+                      placeholder="Type message..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       className="flex-1 bg-[#FAF7F2] rounded-lg px-3 py-1.5 text-xs outline-none text-zinc-900 font-medium border border-[#E5DFD3] focus:border-zinc-900"
@@ -1743,6 +1764,23 @@ export default function RiderPanel({
       <div className="bg-[#FAF7F2] p-2.5 text-center text-[10px] text-zinc-600 border-t border-[#E5DFD3] flex items-center justify-center gap-1 font-mono font-semibold">
         <span>Payment Method secured by Stripe Proxy</span>
       </div>
+
+      {/* In-App Voice Call Modal */}
+      {trip && (
+        <VoiceCallModal
+          isOpen={isVoiceCallOpen}
+          onClose={() => setIsVoiceCallOpen(false)}
+          callerName={trip.driver.name}
+          callerAvatar={trip.driver.avatar}
+          callerRole="Driver"
+          vehicleInfo={`${trip.driver.vehicleName} (${trip.driver.plateNumber})`}
+          phoneNumber={trip.driver.phone}
+          onSendQuickChat={(txt) => {
+            onSendMessage(txt);
+            setShowChat(true);
+          }}
+        />
+      )}
     </div>
   );
 }
