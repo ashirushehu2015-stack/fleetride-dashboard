@@ -5,8 +5,9 @@ import MapContainer from './components/MapContainer';
 import RiderPanel from './components/RiderPanel';
 import DriverPanel from './components/DriverPanel';
 import SettingsPanel from './components/SettingsPanel';
-import DashboardPanel from './components/DashboardPanel';
+import DashboardPanel, { DashboardDisplayScreen, NavSection } from './components/DashboardPanel';
 import UserManagementPanel from './components/UserManagementPanel';
+import UserManagementDisplayScreen from './components/UserManagementDisplayScreen';
 import LandingPage from './components/LandingPage';
 import ZamTaxiLogo from './components/ZamTaxiLogo';
 import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert } from 'lucide-react';
@@ -28,6 +29,11 @@ export default function App() {
   const [origin, setOrigin] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
   const [travelMode, setTravelMode] = useState<'municipal' | 'interstate'>('municipal');
+  const [adminSection, setAdminSection] = useState<NavSection>('all');
+  const [adminViewMode, setAdminViewMode] = useState<'screen' | 'map'>('screen');
+  const [usersViewMode, setUsersViewMode] = useState<'screen' | 'map'>('screen');
+  const [userSubTab, setUserSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
+  const [selectedUser, setSelectedUser] = useState<{ id: string; type: 'passenger' | 'driver' | 'admin' } | null>(null);
 
   // Initial Passengers fallback
   const INITIAL_PASSENGERS = [
@@ -1018,8 +1024,8 @@ export default function App() {
       {/* CORE TWO-COLUMN MAIN FRAME */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch overflow-hidden">
         
-        {/* LEFT COLUMN: INTERACTIVE INPUT PANEL (4 cols) */}
-        <div className="lg:col-span-5 xl:col-span-4 h-full flex flex-col justify-start">
+        {/* LEFT COLUMN: INTERACTIVE INPUT PANEL (5 cols) */}
+        <div className="lg:col-span-6 xl:col-span-5 h-full flex flex-col justify-start">
           {activeTab === 'dashboard' && (
             profile.role === 'admin' ? (
               <DashboardPanel
@@ -1030,7 +1036,15 @@ export default function App() {
                 isPeakTraffic={isPeakTraffic}
                 setIsPeakTraffic={setIsPeakTraffic}
                 currentCity={currentCity}
-                onReplayTrip={handleReplayTrip}
+                onReplayTrip={(trip) => {
+                  setAdminViewMode('map');
+                  handleReplayTrip(trip);
+                }}
+                activeSection={adminSection}
+                onSelectSection={(sec) => {
+                  setAdminSection(sec);
+                  setAdminViewMode('screen');
+                }}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -1135,6 +1149,17 @@ export default function App() {
                 isPeakTraffic={isPeakTraffic}
                 setIsPeakTraffic={setIsPeakTraffic}
                 completedTrips={completedTrips}
+                subTab={userSubTab}
+                onSelectSubTab={(st) => {
+                  setUserSubTab(st);
+                  setSelectedUser(null);
+                  setUsersViewMode('screen');
+                }}
+                selectedUserId={selectedUser?.id}
+                onSelectUser={(userId, type) => {
+                  setSelectedUser(userId ? { id: userId, type } : null);
+                  setUsersViewMode('screen');
+                }}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -1146,22 +1171,69 @@ export default function App() {
           )}
         </div>
 
-        {/* RIGHT COLUMN: LARGE MAP CONTAINER (8 cols) */}
-        <div className="lg:col-span-7 xl:col-span-8 min-h-[400px] lg:h-full relative flex flex-col">
-          <MapContainer
-            city={currentCity}
-            origin={origin}
-            destination={destination}
-            setOrigin={setOrigin}
-            setDestination={setDestination}
-            trip={trip}
-            isDriverMode={activeTab === 'driver'}
-            driverPosition={driverPosition}
-            roamingCars={roamingCars}
-            travelMode={travelMode}
-            replayingTrip={replayingTrip}
-            onStopReplay={() => setReplayingTrip(null)}
-          />
+        {/* RIGHT COLUMN: DISPLAY SCREEN OR LARGE MAP CONTAINER (7 cols) */}
+        <div className="lg:col-span-6 xl:col-span-7 min-h-[400px] lg:h-full relative flex flex-col">
+          {activeTab === 'dashboard' && profile.role === 'admin' && adminViewMode === 'screen' ? (
+            <DashboardDisplayScreen
+              activeSection={adminSection}
+              setActiveSection={setAdminSection}
+              completedTrips={completedTrips}
+              onTriggerRandomTrip={handleTriggerRandomTrip}
+              isSurgeActive={isSurgeActive}
+              setIsSurgeActive={setIsSurgeActive}
+              isPeakTraffic={isPeakTraffic}
+              setIsPeakTraffic={setIsPeakTraffic}
+              currentCity={currentCity}
+              onReplayTrip={(trip) => {
+                setAdminViewMode('map');
+                handleReplayTrip(trip);
+              }}
+              onShowMap={() => setAdminViewMode('map')}
+            />
+          ) : activeTab === 'users' && profile.role === 'admin' && usersViewMode === 'screen' ? (
+            <UserManagementDisplayScreen
+              activeProfile={profile}
+              setActiveProfile={setProfile}
+              setActiveTab={setActiveTab}
+              subTab={userSubTab}
+              setSubTab={setUserSubTab}
+              selectedUser={selectedUser}
+              setSelectedUser={setSelectedUser}
+              passengers={passengers}
+              setPassengers={setPassengers}
+              drivers={drivers}
+              setDrivers={setDrivers}
+              admins={admins}
+              setAdmins={setAdmins}
+              auditLogs={auditLogs}
+              addAuditLog={addAuditLog}
+              isSurgeActive={isSurgeActive}
+              setIsSurgeActive={setIsSurgeActive}
+              isPeakTraffic={isPeakTraffic}
+              setIsPeakTraffic={setIsPeakTraffic}
+              completedTrips={completedTrips}
+              onShowMap={() => setUsersViewMode('map')}
+              onReplayTrip={(trip) => {
+                setUsersViewMode('map');
+                handleReplayTrip(trip);
+              }}
+            />
+          ) : (
+            <MapContainer
+              city={currentCity}
+              origin={origin}
+              destination={destination}
+              setOrigin={setOrigin}
+              setDestination={setDestination}
+              trip={trip}
+              isDriverMode={activeTab === 'driver'}
+              driverPosition={driverPosition}
+              roamingCars={roamingCars}
+              travelMode={travelMode}
+              replayingTrip={replayingTrip}
+              onStopReplay={() => setReplayingTrip(null)}
+            />
+          )}
         </div>
       </main>
 

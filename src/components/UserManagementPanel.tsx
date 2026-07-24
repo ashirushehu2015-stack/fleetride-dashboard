@@ -80,6 +80,12 @@ interface UserManagementPanelProps {
   isPeakTraffic?: boolean;
   setIsPeakTraffic?: (val: boolean) => void;
   completedTrips: Trip[];
+
+  // Optional display screen synchronization props
+  subTab?: 'passengers' | 'drivers' | 'admins' | 'control' | 'trips';
+  onSelectSubTab?: (st: 'passengers' | 'drivers' | 'admins' | 'control' | 'trips') => void;
+  selectedUserId?: string | null;
+  onSelectUser?: (userId: string | null, type: 'passenger' | 'driver' | 'admin') => void;
 }
 
 export default function UserManagementPanel({
@@ -99,9 +105,19 @@ export default function UserManagementPanel({
   setIsSurgeActive,
   isPeakTraffic = false,
   setIsPeakTraffic,
-  completedTrips
+  completedTrips,
+  subTab: propsSubTab,
+  onSelectSubTab,
+  selectedUserId,
+  onSelectUser
 }: UserManagementPanelProps) {
-  const [subTab, setSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
+  const [internalSubTab, setInternalSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
+  const subTab = propsSubTab !== undefined ? propsSubTab : internalSubTab;
+
+  const handleSubTabChange = (st: 'passengers' | 'drivers' | 'admins' | 'control' | 'trips') => {
+    setInternalSubTab(st);
+    if (onSelectSubTab) onSelectSubTab(st);
+  };
   const [searchTerm, setSearchTerm] = useState('');
   
   // Form modal states
@@ -175,7 +191,7 @@ export default function UserManagementPanel({
         role: 'admin'
       });
       addAuditLog('SYSTEM', `Switched active simulation profile to Admin: ${target.name}`);
-      setSubTab('control'); // Go to console
+      handleSubTabChange('control'); // Go to console
     }
   };
 
@@ -395,7 +411,7 @@ export default function UserManagementPanel({
       {/* COMPONENT SUB-TAB NAVIGATION */}
       <div className="px-3 py-2 bg-[#FAF7F2] border-b border-[#E5DFD3] flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
         <button
-          onClick={() => { setSubTab('passengers'); setSearchTerm(''); }}
+          onClick={() => { handleSubTabChange('passengers'); setSearchTerm(''); }}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
             subTab === 'passengers' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-700 hover:text-zinc-900 hover:bg-[#F2EDE4]'
           }`}
@@ -404,7 +420,7 @@ export default function UserManagementPanel({
           Passengers ({passengers.length})
         </button>
         <button
-          onClick={() => { setSubTab('drivers'); setSearchTerm(''); }}
+          onClick={() => { handleSubTabChange('drivers'); setSearchTerm(''); }}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
             subTab === 'drivers' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-700 hover:text-zinc-900 hover:bg-[#F2EDE4]'
           }`}
@@ -413,7 +429,7 @@ export default function UserManagementPanel({
           Drivers ({drivers.length})
         </button>
         <button
-          onClick={() => { setSubTab('admins'); setSearchTerm(''); }}
+          onClick={() => { handleSubTabChange('admins'); setSearchTerm(''); }}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
             subTab === 'admins' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-700 hover:text-zinc-900 hover:bg-[#F2EDE4]'
           }`}
@@ -422,7 +438,7 @@ export default function UserManagementPanel({
           Admins ({admins.length})
         </button>
         <button
-          onClick={() => { setSubTab('control'); setSearchTerm(''); }}
+          onClick={() => { handleSubTabChange('control'); setSearchTerm(''); }}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
             subTab === 'control' ? 'bg-amber-400 text-zinc-950 font-extrabold shadow-xs' : 'text-amber-800 hover:text-amber-900 hover:bg-amber-100'
           }`}
@@ -431,7 +447,7 @@ export default function UserManagementPanel({
           Admin Control Tower
         </button>
         <button
-          onClick={() => { setSubTab('trips'); setSearchTerm(''); }}
+          onClick={() => { handleSubTabChange('trips'); setSearchTerm(''); }}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
             subTab === 'trips' ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-700 hover:text-zinc-900 hover:bg-[#F2EDE4]'
           }`}
@@ -500,10 +516,11 @@ export default function UserManagementPanel({
                 return (
                   <div 
                     key={pass.id} 
-                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 ${
-                      isActive 
-                        ? 'bg-zinc-900/80 border-emerald-500/40 shadow-[0_0_12px_-3px_rgba(16,185,129,0.15)]' 
-                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-800'
+                    onClick={() => onSelectUser?.(pass.id, 'passenger')}
+                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 cursor-pointer ${
+                      isActive || selectedUserId === pass.id
+                        ? 'bg-zinc-900/80 border-emerald-500/60 shadow-[0_0_12px_-3px_rgba(16,185,129,0.25)]' 
+                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-750'
                     } ${pass.status === 'SUSPENDED' ? 'opacity-65' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2.5">
@@ -660,10 +677,11 @@ export default function UserManagementPanel({
                 return (
                   <div 
                     key={drv.id || drv.name} 
-                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 ${
-                      isActive 
-                        ? 'bg-zinc-900/80 border-blue-500/40 shadow-[0_0_12px_-3px_rgba(59,130,246,0.15)]' 
-                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-800'
+                    onClick={() => onSelectUser?.(drv.id || drv.name, 'driver')}
+                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 cursor-pointer ${
+                      isActive || selectedUserId === (drv.id || drv.name)
+                        ? 'bg-zinc-900/80 border-blue-500/60 shadow-[0_0_12px_-3px_rgba(59,130,246,0.25)]' 
+                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-750'
                     } ${drv.status === 'SUSPENDED' ? 'opacity-65' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2.5">
@@ -800,10 +818,11 @@ export default function UserManagementPanel({
                 return (
                   <div 
                     key={ad.id} 
-                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 ${
-                      isActive 
-                        ? 'bg-zinc-900/80 border-amber-500/40 shadow-[0_0_12px_-3px_rgba(245,158,11,0.15)]' 
-                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-800'
+                    onClick={() => onSelectUser?.(ad.id, 'admin')}
+                    className={`p-3 rounded-xl border transition-all flex flex-col gap-3 cursor-pointer ${
+                      isActive || selectedUserId === ad.id
+                        ? 'bg-zinc-900/80 border-amber-500/60 shadow-[0_0_12px_-3px_rgba(245,158,11,0.25)]' 
+                        : 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-750'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2.5">
