@@ -67,6 +67,7 @@ interface RiderPanelProps {
   chatMessages: ChatMessage[];
   onSendMessage: (text: string) => void;
   isSurgeActive?: boolean;
+  isPeakTraffic?: boolean;
   travelMode: 'municipal' | 'interstate';
   setTravelMode: (mode: 'municipal' | 'interstate') => void;
   profile?: UserProfile;
@@ -92,6 +93,7 @@ export default function RiderPanel({
   chatMessages,
   onSendMessage,
   isSurgeActive = false,
+  isPeakTraffic = false,
   travelMode,
   setTravelMode,
   profile,
@@ -2012,6 +2014,17 @@ export default function RiderPanel({
                 {trip.status === 'ARRIVED' && 'Driver has arrived at your pick-up point!'}
                 {trip.status === 'TRIP_IN_PROGRESS' && 'Trip in progress - Heading to destination'}
               </div>
+
+              {/* Peak Traffic Warning Banner */}
+              {isPeakTraffic && (
+                <div className="bg-red-50 text-red-950 border border-red-200 px-3 py-2 rounded-xl text-[10px] font-bold flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-1.5">
+                    <Clock size={13} className="text-red-600 shrink-0 animate-spin" />
+                    <span>Peak Traffic Conditions Active: Travel speed is 2x slower.</span>
+                  </div>
+                  <span className="font-mono bg-red-200 text-red-900 px-1.5 py-0.5 rounded text-[9px] font-black">2x SLOW</span>
+                </div>
+              )}
 
               {/* Progress Bar */}
               <div className="space-y-1">

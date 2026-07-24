@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import VoiceCallModal from './VoiceCallModal';
 import SafetyToolkitModal from './SafetyToolkitModal';
+import DriverOnboardingModal from './DriverOnboardingModal';
 import { UserProfile, Location, Trip } from '../types';
 import { MOCK_PASSENGERS } from '../data';
 import {
@@ -162,6 +163,7 @@ export default function DriverPanel({
   const [recentEarnings, setRecentEarnings] = useState<number>(0);
   const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
   const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState<boolean>(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
   const [showDriverChat, setShowDriverChat] = useState<boolean>(false);
   const [driverChatInput, setDriverChatInput] = useState<string>('');
   const [weeklyEarnings, setWeeklyEarnings] = useState(getInitialWeeklyEarnings);
@@ -517,6 +519,55 @@ export default function DriverPanel({
                   <Play size={16} className="fill-white" /> Go Online to Earn
                 </>
               )}
+            </button>
+          </div>
+        )}
+
+        {/* ZAMFARA STATE EV FINANCING & ONBOARDING CARD */}
+        {driverState === 'IDLE' && (
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-zinc-950 p-4 rounded-2xl text-white border border-emerald-500/30 space-y-3 shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Zap size={14} />
+                </div>
+                <div>
+                  <span className="block text-xs font-black uppercase tracking-wider text-white">
+                    Commercial EV Financing Portal
+                  </span>
+                  <span className="block text-[9.5px] text-emerald-300 font-medium">
+                    Zamfara State 30% Govt Micro-Financing Scheme
+                  </span>
+                </div>
+              </div>
+
+              <span className="bg-emerald-500/20 text-emerald-300 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border border-emerald-500/30">
+                ACTIVE SCHEME
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-[10px] bg-black/30 p-2.5 rounded-xl border border-white/10 font-mono">
+              <div>
+                <span className="block text-zinc-400 text-[8.5px] uppercase">Subsidy Rate</span>
+                <span className="block text-emerald-400 font-bold">30% Grant</span>
+              </div>
+              <div>
+                <span className="block text-zinc-400 text-[8.5px] uppercase">Daily Micro-Pay</span>
+                <span className="block text-white font-bold">₦3,500/day</span>
+              </div>
+              <div>
+                <span className="block text-zinc-400 text-[8.5px] uppercase">NIN/BVN Status</span>
+                <span className="block text-emerald-400 font-bold">Verified ✅</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsOnboardingModalOpen(true)}
+              className="w-full bg-white hover:bg-emerald-50 text-emerald-950 text-xs font-extrabold py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              id="open-driver-financing-portal-btn"
+            >
+              <Award size={14} className="text-emerald-700" />
+              Manage EV Vehicle Financing & Document Uploads
             </button>
           </div>
         )}
@@ -1128,6 +1179,15 @@ export default function DriverPanel({
           currentPosition: activeTrip.origin,
           timestamp: new Date().toISOString()
         } : null}
+      />
+
+      {/* Driver EV Onboarding & Financing Portal Modal */}
+      <DriverOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        onCompleteOnboarding={(updatedData) => {
+          setIsOnboardingModalOpen(false);
+        }}
       />
     </div>
   );

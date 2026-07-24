@@ -300,6 +300,14 @@ export default function App() {
   });
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
   const [isSurgeActive, setIsSurgeActive] = useState<boolean>(false);
+  const [isPeakTraffic, setIsPeakTraffic] = useState<boolean>(() => {
+    return localStorage.getItem('zamfara_peak_traffic') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_peak_traffic', String(isPeakTraffic));
+  }, [isPeakTraffic]);
+
   const [trip, setTrip] = useState<Trip | null>(null);
   const [replayingTrip, setReplayingTrip] = useState<Trip | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -385,6 +393,8 @@ export default function App() {
   const handleBookTrip = (vehicleType: string, price: number, distance: number, duration: number) => {
     if (!origin || !destination) return;
 
+    const actualDuration = isPeakTraffic ? Math.round(duration * 1.8) : duration;
+
     // Phase 1: Search mode
     const newTrip: Trip = {
       id: Math.random().toString(36).substr(2, 9),
@@ -393,7 +403,7 @@ export default function App() {
       vehicleType: vehicleType as any,
       price,
       distanceMiles: distance,
-      durationMinutes: duration,
+      durationMinutes: actualDuration,
       driver: {
         name: 'Michael Scott',
         rating: 4.85,
@@ -564,8 +574,11 @@ export default function App() {
       const targetPos = { lat: trip.origin.lat, lng: trip.origin.lng };
 
       let localFactor = 0;
+      const leg1Interval = isPeakTraffic ? 3600 : 1800; // 2x slower when Peak Traffic is ON
+      const leg1Increment = isPeakTraffic ? 0.1 : 0.2;
+
       timer = setInterval(() => {
-        localFactor += 0.2; // 5 steps
+        localFactor += leg1Increment;
         if (localFactor >= 1.0) {
           clearInterval(timer);
           setTrip((prev) => {
@@ -607,7 +620,7 @@ export default function App() {
             };
           });
         }
-      }, 1800);
+      }, leg1Interval);
     }
 
     // WAITING FOR BOARDING AT PICKUP SPOT
@@ -650,8 +663,11 @@ export default function App() {
       const targetPos = { lat: trip.destination.lat, lng: trip.destination.lng };
 
       let localFactor = 0;
+      const leg2Interval = isPeakTraffic ? 4000 : 2000; // 2x slower when Peak Traffic is ON
+      const leg2Increment = isPeakTraffic ? 0.075 : 0.15;
+
       timer = setInterval(() => {
-        localFactor += 0.15; // ~7 steps
+        localFactor += leg2Increment;
         if (localFactor >= 1.0) {
           clearInterval(timer);
           // Complete and charge passenger account
@@ -716,14 +732,14 @@ export default function App() {
             };
           });
         }
-      }, 2000);
+      }, leg2Interval);
     }
 
     return () => {
       clearInterval(timer);
       clearTimeout(timer);
     };
-  }, [trip?.status]);
+  }, [trip?.status, isPeakTraffic]);
 
   // Cancel ongoing trip
   const handleCancelTrip = () => {
@@ -1011,6 +1027,8 @@ export default function App() {
                 onTriggerRandomTrip={handleTriggerRandomTrip}
                 isSurgeActive={isSurgeActive}
                 setIsSurgeActive={setIsSurgeActive}
+                isPeakTraffic={isPeakTraffic}
+                setIsPeakTraffic={setIsPeakTraffic}
                 currentCity={currentCity}
                 onReplayTrip={handleReplayTrip}
               />
@@ -1040,6 +1058,7 @@ export default function App() {
                 chatMessages={chatMessages}
                 onSendMessage={handleSendMessage}
                 isSurgeActive={isSurgeActive}
+                isPeakTraffic={isPeakTraffic}
                 travelMode={travelMode}
                 setTravelMode={setTravelMode}
                 profile={profile}
@@ -1113,6 +1132,8 @@ export default function App() {
                 addAuditLog={addAuditLog}
                 isSurgeActive={isSurgeActive}
                 setIsSurgeActive={setIsSurgeActive}
+                isPeakTraffic={isPeakTraffic}
+                setIsPeakTraffic={setIsPeakTraffic}
                 completedTrips={completedTrips}
               />
             ) : (

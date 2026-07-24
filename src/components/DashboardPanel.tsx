@@ -44,6 +44,8 @@ interface DashboardPanelProps {
   onTriggerRandomTrip: (trip: Trip) => void;
   isSurgeActive: boolean;
   setIsSurgeActive: (val: boolean) => void;
+  isPeakTraffic?: boolean;
+  setIsPeakTraffic?: (val: boolean) => void;
   currentCity: {
     id: string;
     name: string;
@@ -70,6 +72,8 @@ export default function DashboardPanel({
   onTriggerRandomTrip,
   isSurgeActive,
   setIsSurgeActive,
+  isPeakTraffic = false,
+  setIsPeakTraffic,
   currentCity,
   onReplayTrip,
 }: DashboardPanelProps) {
@@ -311,22 +315,56 @@ export default function DashboardPanel({
           </div>
         </div>
 
-        {/* Live Surge Actuator Toggle */}
-        <button
-          onClick={() => setIsSurgeActive(!isSurgeActive)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-            isSurgeActive
-              ? 'bg-amber-400 text-zinc-950 shadow-xs animate-pulse'
-              : 'bg-white text-zinc-800 border border-[#E5DFD3] hover:bg-[#FAF7F2]'
-          }`}
-          id="toggle-dashboard-surge-btn"
-        >
-          <Zap size={12} className={isSurgeActive ? 'fill-zinc-950' : ''} />
-          {isSurgeActive ? 'Surge Active (1.8x)' : 'Trigger Surge (Peak)'}
-        </button>
+        {/* Live Simulation Actuator Toggles */}
+        <div className="flex items-center gap-2">
+          {/* Peak Traffic Simulator Toggle */}
+          <button
+            onClick={() => setIsPeakTraffic?.(!isPeakTraffic)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              isPeakTraffic
+                ? 'bg-red-600 text-white shadow-xs animate-pulse ring-2 ring-red-400/50'
+                : 'bg-white text-zinc-800 border border-[#E5DFD3] hover:bg-[#FAF7F2]'
+            }`}
+            id="toggle-dashboard-peak-traffic-btn"
+            title="Slows down simulated trip duration parameters for all active journeys"
+          >
+            <Clock size={13} className={isPeakTraffic ? 'animate-spin' : ''} />
+            {isPeakTraffic ? 'Peak Traffic (2x Slow)' : 'Simulate Peak Traffic'}
+          </button>
+
+          {/* Live Surge Actuator Toggle */}
+          <button
+            onClick={() => setIsSurgeActive(!isSurgeActive)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+              isSurgeActive
+                ? 'bg-amber-400 text-zinc-950 shadow-xs animate-pulse'
+                : 'bg-white text-zinc-800 border border-[#E5DFD3] hover:bg-[#FAF7F2]'
+            }`}
+            id="toggle-dashboard-surge-btn"
+          >
+            <Zap size={12} className={isSurgeActive ? 'fill-zinc-950' : ''} />
+            {isSurgeActive ? 'Surge Active (1.8x)' : 'Trigger Surge'}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+
+        {/* PEAK TRAFFIC ACTIVE ALERT BANNER */}
+        {isPeakTraffic && (
+          <div className="bg-red-50 border border-red-200 text-red-950 px-4 py-2.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+              </span>
+              <span>🚦 Peak Traffic Mode Engaged: Simulated trip duration parameters reduced by 50% across all active journeys.</span>
+            </div>
+            <span className="text-[10px] font-mono bg-red-200 text-red-900 px-2 py-0.5 rounded font-black border border-red-300 shrink-0">
+              2.0x JOURNEY DELAY
+            </span>
+          </div>
+        )}
         
         {/* SECTION 1: KEY PERFORMANCE RATINGS (KPI Grid) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

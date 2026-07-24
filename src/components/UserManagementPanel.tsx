@@ -74,9 +74,11 @@ interface UserManagementPanelProps {
   auditLogs: SystemAuditLog[];
   addAuditLog: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
   
-  // Surge Control
+  // Surge & Traffic Control
   isSurgeActive: boolean;
   setIsSurgeActive: (val: boolean) => void;
+  isPeakTraffic?: boolean;
+  setIsPeakTraffic?: (val: boolean) => void;
   completedTrips: Trip[];
 }
 
@@ -95,6 +97,8 @@ export default function UserManagementPanel({
   addAuditLog,
   isSurgeActive,
   setIsSurgeActive,
+  isPeakTraffic = false,
+  setIsPeakTraffic,
   completedTrips
 }: UserManagementPanelProps) {
   const [subTab, setSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
@@ -904,6 +908,27 @@ export default function UserManagementPanel({
                 >
                   <Sparkles size={11} className={isSurgeActive ? 'animate-bounce' : ''} />
                   {isSurgeActive ? 'SURGE ACTIVE (1.8x)' : 'ACTIVATE SURGE'}
+                </button>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 bg-zinc-900/50 border border-zinc-900 p-3 rounded-xl text-center flex flex-col justify-center items-center">
+                <span className="text-[8px] uppercase tracking-wider text-zinc-500 font-bold block mb-1">Peak Traffic Simulation</span>
+                
+                <button
+                  onClick={() => {
+                    const nextVal = !isPeakTraffic;
+                    setIsPeakTraffic?.(nextVal);
+                    addAuditLog('ADMIN', `Peak Traffic Simulation toggled ${nextVal ? 'ACTIVE (Slowed journey duration by 50%)' : 'OFF (Normal transit speed)'}`);
+                  }}
+                  className={`w-full py-1 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all flex items-center justify-center gap-1 cursor-pointer border ${
+                    isPeakTraffic 
+                      ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse' 
+                      : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white border-zinc-800'
+                  }`}
+                  id="user-mgmt-toggle-peak-btn"
+                >
+                  <Clock size={11} className={isPeakTraffic ? 'animate-spin' : ''} />
+                  {isPeakTraffic ? 'PEAK TRAFFIC (2x SLOW)' : 'SIMULATE PEAK TRAFFIC'}
                 </button>
               </div>
             </div>

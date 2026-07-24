@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Location, VehicleType, UserProfile } from '../types';
 import { CITIES, VEHICLE_CONFIGS } from '../data';
 import ZamTaxiLogo from './ZamTaxiLogo';
+import DriverOnboardingModal from './DriverOnboardingModal';
 // @ts-ignore
 import zamtaxiFront from '../assets/images/zamtaxi_front_1784738289926.jpg';
 // @ts-ignore
@@ -83,13 +84,18 @@ export default function LandingPage({
   // Selected City ID for Municipal Networks dropdown
   const [selectedCityId, setSelectedCityId] = useState('gusau');
   
-  // Login Modal State
+  // Login & Driver Onboarding Modal State
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [authScope, setAuthScope] = useState<'all' | 'rider-only' | 'driver-only'>('rider-only');
+  const [isDriverOnboardingOpen, setIsDriverOnboardingOpen] = useState(false);
+  const [authScope, setAuthScope] = useState<'all' | 'rider-only' | 'driver-only' | 'admin-only'>('rider-only');
   const [loginRole, setLoginRole] = useState<'rider' | 'driver' | 'admin'>('rider');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
-  const openAuthModal = (scope: 'all' | 'rider-only' | 'driver-only', role: 'rider' | 'driver' | 'admin', mode: 'signin' | 'signup') => {
+  const openAuthModal = (scope: 'all' | 'rider-only' | 'driver-only' | 'admin-only', role: 'rider' | 'driver' | 'admin', mode: 'signin' | 'signup') => {
+    if (scope === 'driver-only' && mode === 'signup') {
+      setIsDriverOnboardingOpen(true);
+      return;
+    }
     setAuthScope(scope);
     selectLoginRole(role);
     setAuthMode(mode);
@@ -435,10 +441,10 @@ export default function LandingPage({
           </div>
 
           {/* Nav Right CTA */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
-              className="text-xs font-extrabold text-zinc-900 hover:text-emerald-950 px-3.5 py-2 transition rounded-xl bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="text-xs font-extrabold text-zinc-900 hover:text-emerald-950 px-3 py-2 transition rounded-xl bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 cursor-pointer shadow-xs"
               id="landing-signin-btn"
             >
               <User size={13} className="text-emerald-800" />
@@ -446,11 +452,19 @@ export default function LandingPage({
             </button>
             <button 
               onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-4 py-2 rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-3.5 py-2 rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
               id="landing-getstarted-btn"
             >
               <Car size={13} />
               Driver Portal
+            </button>
+            <button 
+              onClick={() => openAuthModal('admin-only', 'admin', 'signin')}
+              className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-black px-3 py-2 rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer border border-zinc-700"
+              id="landing-admin-portal-btn"
+            >
+              <ShieldCheck size={13} className="text-amber-400" />
+              Admin Portal
             </button>
           </div>
         </div>
@@ -494,10 +508,10 @@ export default function LandingPage({
           </div>
 
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => openAuthModal('rider-only', 'rider', 'signin')}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-6 py-3.5 rounded-xl transition shadow-lg shadow-emerald-900/20 flex items-center gap-2 cursor-pointer"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-5 py-3.5 rounded-xl transition shadow-lg shadow-emerald-900/20 flex items-center gap-2 cursor-pointer"
               id="hero-book-ride-cta"
             >
               <User size={15} />
@@ -505,11 +519,19 @@ export default function LandingPage({
             </button>
             <button
               onClick={() => openAuthModal('driver-only', 'driver', 'signup')}
-              className="bg-zinc-950 text-white border-2 border-emerald-600/50 hover:bg-zinc-900 text-xs font-black px-6 py-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md"
+              className="bg-emerald-950 text-white border-2 border-emerald-600/50 hover:bg-zinc-900 text-xs font-black px-5 py-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md"
               id="hero-driver-mode-cta"
             >
               <Car size={15} className="text-emerald-400" />
               Drive & Earn (Driver Mode)
+            </button>
+            <button
+              onClick={() => openAuthModal('admin-only', 'admin', 'signin')}
+              className="bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-zinc-700 text-xs font-black px-5 py-3.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-md"
+              id="hero-admin-mode-cta"
+            >
+              <ShieldCheck size={15} className="text-amber-400" />
+              Admin & Fleet Control
             </button>
           </div>
 
@@ -1427,6 +1449,8 @@ export default function LandingPage({
                 <div className="flex items-center gap-2">
                   {authScope === 'rider-only' ? (
                     <User size={16} className="text-emerald-400" />
+                  ) : authScope === 'admin-only' ? (
+                    <ShieldCheck size={16} className="text-amber-400" />
                   ) : (
                     <Car size={16} className="text-emerald-400" />
                   )}
@@ -1435,6 +1459,8 @@ export default function LandingPage({
                       ? 'Passenger Ride Booking Portal'
                       : authScope === 'driver-only'
                       ? 'ZamTaxi EV Driver Onboarding'
+                      : authScope === 'admin-only'
+                      ? 'Admin & Fleet Control Portal'
                       : 'Authentication Hub'}
                   </span>
                 </div>
@@ -1469,6 +1495,19 @@ export default function LandingPage({
                   </div>
                   <span className="text-[10px] font-extrabold uppercase text-emerald-400 bg-emerald-900/90 px-2.5 py-1 rounded-md border border-emerald-500/40">
                     Driver Mode Only
+                  </span>
+                </div>
+              ) : authScope === 'admin-only' ? (
+                <div className="bg-amber-950/90 border-b border-amber-500/30 px-6 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    <span className="text-xs font-black uppercase text-amber-300 tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-amber-400" />
+                      Admin & Fleet Control Workspace
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase text-amber-300 bg-amber-900/90 px-2.5 py-1 rounded-md border border-amber-500/40">
+                    Admin Mode Only
                   </span>
                 </div>
               ) : (
@@ -1852,6 +1891,26 @@ export default function LandingPage({
             </motion.div>
           </div>
         )}
+
+        {/* ZAMFARA EV DRIVER ONBOARDING & FINANCING MODAL */}
+        <DriverOnboardingModal
+          isOpen={isDriverOnboardingOpen}
+          onClose={() => setIsDriverOnboardingOpen(false)}
+          onCompleteOnboarding={(newDriverData) => {
+            setDrivers((prev) => [newDriverData, ...prev]);
+            const uProfile: UserProfile = {
+              name: newDriverData.name,
+              rating: 5.0,
+              balance: 0.0,
+              isDriver: true,
+              avatar: newDriverData.avatar,
+              role: 'driver'
+            };
+            onLoginSuccess('driver', uProfile, 'driver');
+            setIsDriverOnboardingOpen(false);
+          }}
+          addAuditLog={addAuditLog}
+        />
       </AnimatePresence>
 
     </div>
