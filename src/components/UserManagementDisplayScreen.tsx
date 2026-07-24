@@ -593,48 +593,172 @@ export default function UserManagementDisplayScreen({
 
             {subTab === 'drivers' && (
               <div className="space-y-4">
+                {/* KPI STATS CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="p-3.5 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
+                  <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 block">Total Fleet Drivers</span>
-                    <div className="text-lg font-black text-zinc-900 mt-1">{drivers.length} Drivers</div>
+                    <div className="text-lg font-black text-zinc-900 mt-0.5">{drivers.length} Drivers</div>
                   </div>
-                  <div className="p-3.5 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
+                  <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 block">Verified Drivers</span>
-                    <div className="text-lg font-black text-emerald-700 mt-1">{drivers.filter(d => d.isVerified).length} Verified</div>
+                    <div className="text-lg font-black text-emerald-700 mt-0.5">{drivers.filter(d => d.isVerified).length} Verified</div>
                   </div>
-                  <div className="p-3.5 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
+                  <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 block">Pending Verification</span>
-                    <div className="text-lg font-black text-amber-700 mt-1">{drivers.filter(d => !d.isVerified).length} Pending</div>
+                    <div className="text-lg font-black text-amber-700 mt-0.5">{drivers.filter(d => !d.isVerified).length} Pending</div>
                   </div>
-                  <div className="p-3.5 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
+                  <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-600 block">Avg Fleet Rating</span>
-                    <div className="text-lg font-black text-sky-700 mt-1">4.88 / 5.0</div>
+                    <div className="text-lg font-black text-sky-700 mt-0.5">4.88 / 5.0</div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {drivers.map((drv) => (
-                    <div
-                      key={drv.id || drv.name}
-                      onClick={() => setSelectedUser({ id: drv.id || drv.name, type: 'driver' })}
-                      className="p-4 bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl space-y-3 cursor-pointer hover:border-zinc-400 hover:bg-[#F2EDE4] transition shadow-2xs group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <img src={drv.avatar} alt={drv.name} className="w-10 h-10 rounded-full object-cover border border-[#E5DFD3]" />
-                          <div>
-                            <h4 className="text-xs font-black text-zinc-900 group-hover:text-sky-800 transition">{drv.name}</h4>
-                            <p className="text-[10px] text-zinc-600 font-bold">{drv.vehicleName} • <span className="font-mono text-zinc-500">{drv.plateNumber}</span></p>
+                {/* RICH DRIVER CARDS LIST MATCHING SCREENSHOT */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+                    <span>Fleet Drivers Management Hub</span>
+                    <span className="text-[10px] text-zinc-500 font-normal">Live verification and profile dispatch controls</span>
+                  </h3>
+
+                  <div className="space-y-3">
+                    {drivers.map((drv) => {
+                      const driverId = drv.id || drv.name;
+                      const isCurrentlyActiveProfile = activeProfile.isDriver && activeProfile.name === drv.name;
+
+                      return (
+                        <div
+                          key={driverId}
+                          className="p-4 bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl space-y-3 shadow-2xs hover:border-zinc-400 transition text-left"
+                        >
+                          {/* TOP HEADER ROW */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            {/* LEFT SIDE: AVATAR & NAME & DETAILS */}
+                            <div className="flex items-start gap-3.5">
+                              <img
+                                src={drv.avatar}
+                                alt={drv.name}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-zinc-300 shrink-0 shadow-xs"
+                              />
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-black text-zinc-900">{drv.name}</h4>
+                                  {drv.isVerified ? (
+                                    <span className="text-[9px] px-2 py-0.5 rounded-md font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                      <CheckCircle2 size={10} /> Verified
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] px-2 py-0.5 rounded-md font-extrabold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                      <AlertTriangle size={10} /> Needs Verification
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* VEHICLE & PLATE & CONTACT INFO */}
+                                <div className="flex items-center gap-1.5 flex-wrap text-xs text-zinc-600 font-medium">
+                                  <span>{drv.vehicleName || 'ZamTaxi EV Sedan'}</span>
+                                  <span>•</span>
+                                  <span className="font-mono bg-zinc-900 text-amber-400 font-extrabold px-1.5 py-0.5 rounded text-[10px]">
+                                    {drv.plateNumber || 'ZMF-001'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap text-[11px] mt-0.5">
+                                  <span className="bg-zinc-200 text-zinc-800 font-mono px-1.5 py-0.5 rounded font-bold">
+                                    {drv.phone || '+234 800 000 0000'}
+                                  </span>
+                                  <span className="flex items-center text-amber-600 font-extrabold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                    <Star size={11} className="fill-amber-500 text-amber-500 mr-1" />
+                                    {drv.rating || 5.0}
+                                  </span>
+                                  <span className="bg-zinc-900 text-white font-black px-2 py-0.5 rounded text-[9px] uppercase tracking-wide">
+                                    CATEGORY: {drv.vehicleType || 'X'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* RIGHT SIDE: EXPERIENCE & STATUS */}
+                            <div className="text-right sm:text-right self-stretch sm:self-auto flex sm:flex-col justify-between items-end gap-1 border-t sm:border-t-0 pt-2 sm:pt-0 border-[#E5DFD3]">
+                              <div>
+                                <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider block">EXPERIENCE</span>
+                                <div className="text-sm sm:text-base font-black text-zinc-900 font-mono">
+                                  {drv.completedTrips || 0} Trips
+                                </div>
+                              </div>
+                              <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
+                                drv.status === 'ACTIVE'
+                                  ? 'bg-zinc-900 text-white border-zinc-900'
+                                  : 'bg-red-100 text-red-800 border-red-300'
+                              }`}>
+                                Active State: {drv.status || 'ACTIVE'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* DIVIDER LINE */}
+                          <div className="border-t border-[#E5DFD3] pt-2.5 flex items-center justify-between gap-2 flex-wrap">
+                            {/* ACTION BUTTONS RAIL */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => handleSwitchSession('driver', drv)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                                  isCurrentlyActiveProfile
+                                    ? 'bg-emerald-700 text-white'
+                                    : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                                }`}
+                              >
+                                <UserCheck size={13} className="text-sky-400" />
+                                <span>{isCurrentlyActiveProfile ? 'Active Session Driver' : 'Set Active Driver'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleToggleDriverVerify(driverId)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer border shadow-2xs ${
+                                  drv.isVerified
+                                    ? 'bg-zinc-900 text-white border-zinc-900 hover:bg-zinc-800'
+                                    : 'bg-amber-400 text-zinc-950 border-amber-500 hover:bg-amber-300'
+                                }`}
+                              >
+                                <ShieldCheck size={13} />
+                                <span>{drv.isVerified ? 'Revoke Approval' : 'Approve & Verify'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUser({ id: driverId, type: 'driver' })}
+                                className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#F2EDE4] text-zinc-800 border border-[#E5DFD3] text-xs font-extrabold flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <span>Full Inspector</span>
+                                <ArrowUpRight size={13} />
+                              </button>
+                            </div>
+
+                            {/* RIGHT UTILITY BUTTONS */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleDriverStatus(driverId)}
+                                className="p-1.5 hover:bg-zinc-200 rounded-lg text-zinc-600 transition cursor-pointer"
+                                title="Toggle Active / Suspended"
+                              >
+                                <XCircle size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDriver(driverId, drv.name)}
+                                className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition cursor-pointer"
+                                title="Delete Driver Profile"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <span className={`text-[9px] px-2 py-0.5 rounded font-extrabold border ${
-                          drv.isVerified ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'
-                        }`}>
-                          {drv.isVerified ? 'Verified' : 'Pending'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
