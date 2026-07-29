@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import VoiceCallModal from './VoiceCallModal';
 import SafetyToolkitModal from './SafetyToolkitModal';
 import { QrPaymentModal } from './QrPaymentModal';
+import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import { savePassengerToFirestore } from '../firebase';
@@ -58,7 +59,8 @@ import {
   Trash2,
   Play,
   QrCode,
-  Scan
+  Scan,
+  Receipt
 } from 'lucide-react';
 
 interface RiderPanelProps {
@@ -121,19 +123,7 @@ export default function RiderPanel({
   const [duration, setDuration] = useState<number>(0);
   const [rating, setRating] = useState<number>(5);
   const [reviewText, setReviewText] = useState<string>('');
-  const [selectedTipPercent, setSelectedTipPercent] = useState<number | 'custom'>(10);
-  const [customTipAmount, setCustomTipAmount] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
-
-  const calculateTipAmount = (): number => {
-    if (!trip) return 0;
-    if (selectedTipPercent === 'custom') {
-      const parsed = parseFloat(customTipAmount);
-      return isNaN(parsed) || parsed < 0 ? 0 : parsed;
-    }
-    if (selectedTipPercent === 0) return 0;
-    return Math.round((trip.price * selectedTipPercent) / 100);
-  };
   const [showChat, setShowChat] = useState<boolean>(false);
   const [isVoiceCallOpen, setIsVoiceCallOpen] = useState<boolean>(false);
   const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState<boolean>(false);
@@ -255,6 +245,13 @@ export default function RiderPanel({
   // QR Code Payment Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [qrModalAmount, setQrModalAmount] = useState<number>(5000);
+
+  // Trip Summary Receipt Modal State
+  const [isSummaryReceiptModalOpen, setIsSummaryReceiptModalOpen] = useState<boolean>(false);
+  const [summaryReceiptTrip, setSummaryReceiptTrip] = useState<Trip | null>(null);
+  const [summaryReceiptTip, setSummaryReceiptTip] = useState<number>(0);
+  const [summaryReceiptRating, setSummaryReceiptRating] = useState<number>(5);
+  const [summaryReceiptReview, setSummaryReceiptReview] = useState<string>('');
 
   // Link Payment Method Modal & Form State
   const [isLinkPaymentModalOpen, setIsLinkPaymentModalOpen] = useState<boolean>(false);
@@ -2952,7 +2949,23 @@ export default function RiderPanel({
 
             {/* Receipt Summary Card */}
             <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] text-left space-y-2.5 shadow-xs">
-              <div className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">Receipt Summary</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-extrabold text-zinc-700 uppercase tracking-wider">Receipt Summary</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSummaryReceiptTrip(trip);
+                    setSummaryReceiptTip(0);
+                    setSummaryReceiptRating(rating);
+                    setSummaryReceiptReview(reviewText);
+                    setIsSummaryReceiptModalOpen(true);
+                  }}
+                  className="text-[10px] font-black text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  id="open-receipt-modal-header-btn"
+                >
+                  <Receipt size={12} /> View Full Receipt Modal
+                </button>
+              </div>
               <div className="flex justify-between text-xs">
                 <span className="text-zinc-600 font-medium">Distance Travelled:</span>
                 <span className="font-extrabold text-zinc-900">{trip.distanceMiles} km</span>
@@ -2965,74 +2978,6 @@ export default function RiderPanel({
                 <span className="font-bold text-zinc-800">Total Charged:</span>
                 <span className="font-extrabold text-emerald-700 text-sm">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-            </div>
-
-            {/* Tip Driver Feature */}
-            <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] text-left space-y-3 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-zinc-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Heart size={14} className="text-rose-500 fill-rose-500" /> Tip {trip.driver.name}
-                </span>
-                {calculateTipAmount() > 0 && (
-                  <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full animate-fade-in">
-                    +₦{calculateTipAmount().toLocaleString()} Tip
-                  </span>
-                )}
-              </div>
-
-              <p className="text-[11px] text-zinc-600 font-medium">
-                Show your appreciation! 100% of your tip goes directly to {trip.driver.name}.
-              </p>
-
-              {/* Tip Percentage Selection Grid */}
-              <div className="grid grid-cols-5 gap-1.5">
-                {[
-                  { label: 'None', percent: 0 },
-                  { label: '5%', percent: 5 },
-                  { label: '10%', percent: 10 },
-                  { label: '15%', percent: 15 },
-                  { label: 'Custom', percent: 'custom' as const },
-                ].map((opt) => {
-                  const isSelected = selectedTipPercent === opt.percent;
-                  const tipVal = typeof opt.percent === 'number' && opt.percent > 0 ? Math.round((trip.price * opt.percent) / 100) : null;
-                  
-                  return (
-                    <button
-                      key={String(opt.percent)}
-                      type="button"
-                      onClick={() => setSelectedTipPercent(opt.percent)}
-                      className={`py-2 px-1 rounded-xl text-center border transition cursor-pointer flex flex-col items-center justify-center ${
-                        isSelected
-                          ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm font-bold'
-                          : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-zinc-100 font-semibold'
-                      }`}
-                      id={`tip-opt-${opt.percent}`}
-                    >
-                      <span className="text-xs font-bold">{opt.label}</span>
-                      {tipVal !== null && (
-                        <span className={`text-[9px] ${isSelected ? 'text-emerald-300' : 'text-zinc-500'}`}>
-                          ₦{tipVal}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Custom Tip Input */}
-              {selectedTipPercent === 'custom' && (
-                <div className="pt-1 flex items-center gap-2">
-                  <span className="text-xs font-bold text-zinc-700">₦</span>
-                  <input
-                    type="number"
-                    placeholder="Enter custom tip (e.g. 500)"
-                    value={customTipAmount}
-                    onChange={(e) => setCustomTipAmount(e.target.value)}
-                    className="flex-1 bg-white border border-[#E5DFD3] rounded-lg px-3 py-1.5 text-xs outline-none text-zinc-900 font-bold focus:border-zinc-900"
-                    id="custom-tip-input-field"
-                  />
-                </div>
-              )}
             </div>
 
             {/* Rating Stars Selection */}
@@ -3069,7 +3014,7 @@ export default function RiderPanel({
                 placeholder="He was incredibly polite, clean car, or fastest route ever taken..."
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
-                className="w-full bg-[#FAF7F2] text-xs border border-[#E5DFD3] rounded-xl p-3 h-16 outline-none focus:bg-white focus:border-zinc-900 resize-none text-zinc-900 font-medium"
+                className="w-full bg-[#FAF7F2] text-xs border border-[#E5DFD3] rounded-xl p-3 h-16 outline-none focus:bg-[#FFFFFF] focus:border-zinc-900 resize-none text-zinc-900 font-medium"
                 id="driver-feedback-textarea"
               />
             </div>
@@ -3089,17 +3034,27 @@ export default function RiderPanel({
 
             <button
               onClick={() => {
-                const tipVal = calculateTipAmount();
-                onCompleteTripRating(rating, reviewText, tipVal);
+                const completedTripCopy: Trip = {
+                  ...trip,
+                  rating,
+                  review: reviewText,
+                  tip: 0,
+                  status: 'COMPLETED'
+                };
+                setSummaryReceiptTrip(completedTripCopy);
+                setSummaryReceiptTip(0);
+                setSummaryReceiptRating(rating);
+                setSummaryReceiptReview(reviewText);
+                setIsSummaryReceiptModalOpen(true);
+
+                onCompleteTripRating(rating, reviewText, 0);
                 setReviewText('');
                 setRating(5);
-                setSelectedTipPercent(10);
-                setCustomTipAmount('');
               }}
               className="w-full bg-zinc-900 text-white font-extrabold py-3.5 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center gap-1.5 text-xs shadow-md cursor-pointer"
               id="submit-rating-and-review-btn"
             >
-              Submit Feedback {calculateTipAmount() > 0 ? `& Send ₦${calculateTipAmount().toLocaleString()} Tip` : ''}
+              Submit Feedback
             </button>
           </div>
         )}
@@ -3398,6 +3353,18 @@ export default function RiderPanel({
         accountNumber="3098172654"
         bankName="Zenith Bank / FirstBank"
         onPaymentSuccess={handleQrPaymentSuccess}
+      />
+
+      {/* Trip Summary Receipt Modal */}
+      <TripSummaryReceiptModal
+        isOpen={isSummaryReceiptModalOpen}
+        onClose={() => setIsSummaryReceiptModalOpen(false)}
+        trip={summaryReceiptTrip || trip}
+        profile={profile}
+        tipAmount={summaryReceiptTip}
+        rating={summaryReceiptRating}
+        reviewText={summaryReceiptReview}
+        onReplayTrip={onReplayTrip}
       />
     </div>
   );
