@@ -9,8 +9,9 @@ import DashboardPanel, { DashboardDisplayScreen, NavSection } from './components
 import UserManagementPanel from './components/UserManagementPanel';
 import UserManagementDisplayScreen from './components/UserManagementDisplayScreen';
 import LandingPage from './components/LandingPage';
+import StakeholderPresentationModal from './components/StakeholderPresentationModal';
 import ZamTaxiLogo from './components/ZamTaxiLogo';
-import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert } from 'lucide-react';
+import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert, Presentation } from 'lucide-react';
 // @ts-ignore
 import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
 import { 
@@ -34,6 +35,7 @@ export default function App() {
   const [usersViewMode, setUsersViewMode] = useState<'screen' | 'map'>('screen');
   const [userSubTab, setUserSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
   const [selectedUser, setSelectedUser] = useState<{ id: string; type: 'passenger' | 'driver' | 'admin' } | null>(null);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
 
   // Initial Passengers fallback
   const INITIAL_PASSENGERS = [
@@ -993,6 +995,16 @@ export default function App() {
           </div>
 
           <button
+            onClick={() => setIsPresentationOpen(true)}
+            className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-2xs"
+            title="System Presentation for Stakeholders"
+            id="btn-open-presentation-modal"
+          >
+            <Presentation size={15} className="text-emerald-700" />
+            <span className="hidden md:inline">Presentation Deck</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`p-2.5 rounded-xl border transition cursor-pointer ${
               activeTab === 'settings'
@@ -1248,6 +1260,11 @@ export default function App() {
           <span>CITY ID: {currentCity.id.toUpperCase()}</span>
         </div>
       </footer>
+
+      <StakeholderPresentationModal
+        isOpen={isPresentationOpen}
+        onClose={() => setIsPresentationOpen(false)}
+      />
     </div>
   );
 }
