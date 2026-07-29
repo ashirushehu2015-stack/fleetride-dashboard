@@ -237,7 +237,7 @@ export const VEHICLE_CONFIGS: VehicleConfig[] = [
     id: 'Black',
     name: 'ZamTaxi Premium',
     multiplier: 2.3,
-    capacity: 4,
+    capacity: 1,
     description: 'Premium executive rides with professional drivers',
     etaMinutes: 5,
     icon: 'Award'
