@@ -413,7 +413,7 @@ export default function App() {
   // ==========================================
   // 3. RIDER MODE SIMULATION STATE TICKER
   // ==========================================
-  const handleBookTrip = (vehicleType: string, price: number, distance: number, duration: number) => {
+  const handleBookTrip = (vehicleType: string, price: number, distance: number, duration: number, isPrepaid?: boolean) => {
     if (!origin || !destination) return;
 
     const actualDuration = isPeakTraffic ? Math.round(duration * 1.8) : duration;
@@ -445,6 +445,7 @@ export default function App() {
       passengerName: profile.name,
       passengerAvatar: profile.avatar,
       passengerRating: profile.rating,
+      isPrepaid: !!isPrepaid
     };
 
     setTrip(newTrip);
@@ -693,9 +694,9 @@ export default function App() {
         localFactor += leg2Increment;
         if (localFactor >= 1.0) {
           clearInterval(timer);
-          // Complete and charge passenger account
+          // Complete and charge passenger account (if not pre-paid)
           setProfile((prev) => {
-            const nextBal = parseFloat((prev.balance - trip.price).toFixed(2));
+            const nextBal = trip.isPrepaid ? prev.balance : parseFloat((prev.balance - trip.price).toFixed(2));
             
             // Sync inside passengers list
             setPassengers((prevList) => prevList.map(p => {
@@ -727,7 +728,11 @@ export default function App() {
           }));
 
           // Add dynamic system log
-          addAuditLog('SYSTEM', `Trip completed! Charged Rider ${profile.name} ₦${trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Driver ${trip.driver.name} credited.`);
+          if (trip.isPrepaid) {
+            addAuditLog('SYSTEM', `Trip completed! Pre-paid scheduled ride (₦${trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}) fulfilled. Rider ${profile.name} account finalized.`);
+          } else {
+            addAuditLog('SYSTEM', `Trip completed! Charged Rider ${profile.name} ₦${trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Driver ${trip.driver.name} credited.`);
+          }
 
           setTrip((prev) => {
             if (!prev) return null;

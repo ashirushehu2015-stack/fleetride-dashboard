@@ -40,6 +40,8 @@ export interface ScheduledRide {
   createdAt: string;
   notes?: string;
   travelMode?: 'municipal' | 'interstate';
+  isPaid?: boolean;
+  paidAmount?: number;
 }
 
 export type TripStatus =
@@ -72,6 +74,7 @@ export interface Trip {
   passengerName?: string;
   passengerAvatar?: string;
   passengerRating?: number;
+  isPrepaid?: boolean;
 }
 
 export interface ChatMessage {

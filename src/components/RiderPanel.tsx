@@ -5,6 +5,15 @@ import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide 
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import { savePassengerToFirestore } from '../firebase';
 import {
+  NIGERIAN_BANKS,
+  validateNigerianCard,
+  validateNigerianBankAccount,
+  detectCardBrand,
+  CardBrand,
+  CardValidationErrors,
+  BankAccountValidationErrors
+} from '../utils/nigerianBankingValidation';
+import {
   MapPin,
   ChevronDown,
   Navigation,
@@ -62,7 +71,7 @@ interface RiderPanelProps {
   setOrigin: (loc: Location | null) => void;
   setDestination: (loc: Location | null) => void;
   trip: Trip | null;
-  onBookTrip: (vehicleType: string, price: number, distance: number, duration: number) => void;
+  onBookTrip: (vehicleType: string, price: number, distance: number, duration: number, isPrepaid?: boolean) => void;
   onCancelTrip: () => void;
   onCompleteTripRating: (rating: number, review: string, tipAmount?: number) => void;
   chatMessages: ChatMessage[];
@@ -129,7 +138,7 @@ export default function RiderPanel({
 
   // Passenger Navigation & Wallet Sub-states
   const [activeRiderSubTab, setActiveRiderSubTab] = useState<'booking' | 'wallet' | 'scheduled'>('booking');
-  const [walletSubSection, setWalletSubSection] = useState<'deposit' | 'transfer' | 'history'>('deposit');
+  const [walletSubSection, setWalletSubSection] = useState<'deposit' | 'methods' | 'transfer' | 'history'>('deposit');
   
   // Scheduled Rides State
   const [bookingTiming, setBookingTiming] = useState<'now' | 'schedule'>('now');
@@ -176,16 +185,85 @@ export default function RiderPanel({
     localStorage.setItem('zamfara_scheduled_rides', JSON.stringify(scheduledRides));
   }, [scheduledRides]);
   
+  // Saved Payment Methods Interface & State
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState<Array<{
+    id: string;
+    type: 'card' | 'bank_account';
+    title: string;
+    details: string;
+    bankCode?: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+    cardNumber?: string;
+    cardBrand?: CardBrand;
+    expiry?: string;
+    isDefault?: boolean;
+    addedAt: string;
+  }>>(() => {
+    const saved = localStorage.getItem('zamfara_saved_payment_methods');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return [
+      {
+        id: 'pm-101',
+        type: 'card',
+        title: 'FirstBank Verve Debit Card',
+        details: '•••• 4444 (Exp 08/28)',
+        cardNumber: '5061222233334444',
+        cardBrand: 'verve',
+        expiry: '08/28',
+        isDefault: true,
+        addedAt: '2026-07-20'
+      },
+      {
+        id: 'pm-102',
+        type: 'bank_account',
+        title: 'Zenith Bank NUBAN Account',
+        details: '3098172654 • Ashiru Shehu',
+        bankCode: '057',
+        bankName: 'Zenith Bank',
+        accountNumber: '3098172654',
+        accountName: 'Ashiru Shehu',
+        isDefault: false,
+        addedAt: '2026-07-22'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('zamfara_saved_payment_methods', JSON.stringify(savedPaymentMethods));
+  }, [savedPaymentMethods]);
+
   // Deposit State
   const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'card' | 'ussd' | 'voucher'>('bank_transfer');
   const [depositAmount, setDepositAmount] = useState<string>('5000');
   const [copiedVirtualAcc, setCopiedVirtualAcc] = useState<boolean>(false);
   const [copiedUSSD, setCopiedUSSD] = useState<boolean>(false);
-  const [cardNo, setCardNo] = useState<string>('4111 2222 3333 4444');
+  const [cardNo, setCardNo] = useState<string>('5061 2222 3333 4444');
   const [cardExpiry, setCardExpiry] = useState<string>('08/28');
   const [cardCvv, setCardCvv] = useState<string>('892');
+  const [cardPin, setCardPin] = useState<string>('4892');
+  const [cardErrors, setCardErrors] = useState<CardValidationErrors>({});
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [depositStatusMsg, setDepositStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Link Payment Method Modal & Form State
+  const [isLinkPaymentModalOpen, setIsLinkPaymentModalOpen] = useState<boolean>(false);
+  const [linkMethodType, setLinkMethodType] = useState<'card' | 'bank_account'>('card');
+  const [newCardHolder, setNewCardHolder] = useState<string>('Ashiru Shehu');
+  const [newCardNo, setNewCardNo] = useState<string>('5061 2222 3333 4444');
+  const [newCardExpiry, setNewCardExpiry] = useState<string>('08/28');
+  const [newCardCvv, setNewCardCvv] = useState<string>('892');
+  const [newCardPin, setNewCardPin] = useState<string>('4892');
+  const [linkCardErrors, setLinkCardErrors] = useState<CardValidationErrors>({});
+
+  const [newBankCode, setNewBankCode] = useState<string>('057');
+  const [newAccountNumber, setNewAccountNumber] = useState<string>('3098172654');
+  const [newAccountName, setNewAccountName] = useState<string>('Ashiru Shehu');
+  const [linkBankErrors, setLinkBankErrors] = useState<BankAccountValidationErrors>({});
+  const [linkStatusMsg, setLinkStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Transfer Fare State
   const [transferRecipientPhone, setTransferRecipientPhone] = useState<string>('ZamTaxi Central Management Treasury (+234 800 926 8294)');
@@ -275,8 +353,28 @@ export default function RiderPanel({
     }
 
     let methodLabel = 'Bank Transfer';
-    if (depositMethod === 'card') methodLabel = 'Debit Card';
-    if (depositMethod === 'ussd') methodLabel = 'USSD Deposit';
+    if (depositMethod === 'card') {
+      const cardVal = validateNigerianCard({
+        cardNumber: cardNo,
+        expiry: cardExpiry,
+        cvv: cardCvv,
+        pin: cardPin,
+        requirePin: true
+      });
+      if (!cardVal.isValid) {
+        setCardErrors(cardVal.errors);
+        const firstErr = Object.values(cardVal.errors)[0] || 'Invalid card format parameters.';
+        setDepositStatusMsg({
+          type: 'error',
+          text: `Nigerian Banking Validation Error: ${firstErr}`
+        });
+        return;
+      }
+      setCardErrors({});
+      const brandLabel = cardVal.cardBrand === 'verve' ? 'Verve' : cardVal.cardBrand === 'mastercard' ? 'Mastercard' : cardVal.cardBrand === 'visa' ? 'Visa' : 'Debit';
+      methodLabel = `${brandLabel} Debit Card (•••• ${cardNo.replace(/\D/g, '').slice(-4)})`;
+    }
+    if (depositMethod === 'ussd') methodLabel = 'USSD Deposit (*894#)';
     if (depositMethod === 'voucher') {
       const code = voucherCode.trim().toUpperCase();
       if (!code) {
@@ -337,6 +435,116 @@ export default function RiderPanel({
       type: 'success',
       text: `Successfully deposited ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} into your wallet! New balance: ₦${newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
     });
+  };
+
+  // Link Payment Method (Nigerian Banking Format Verification)
+  const handleLinkPaymentMethod = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLinkStatusMsg(null);
+
+    if (linkMethodType === 'card') {
+      const cardVal = validateNigerianCard({
+        cardNumber: newCardNo,
+        expiry: newCardExpiry,
+        cvv: newCardCvv,
+        pin: newCardPin,
+        requirePin: true
+      });
+
+      if (!cardVal.isValid) {
+        setLinkCardErrors(cardVal.errors);
+        const firstErr = Object.values(cardVal.errors)[0] || 'Card format validation failed.';
+        setLinkStatusMsg({
+          type: 'error',
+          text: `Nigerian Card Format Error: ${firstErr}`
+        });
+        return;
+      }
+
+      setLinkCardErrors({});
+      const brand = cardVal.cardBrand;
+      const brandLabel = brand === 'verve' ? 'Verve' : brand === 'mastercard' ? 'Mastercard' : brand === 'visa' ? 'Visa' : 'Debit';
+      const last4 = newCardNo.replace(/\D/g, '').slice(-4);
+
+      const newPm = {
+        id: 'pm-' + Date.now(),
+        type: 'card' as const,
+        title: `${brandLabel} Debit Card`,
+        details: `•••• ${last4} (Exp ${newCardExpiry})`,
+        cardNumber: newCardNo.replace(/\D/g, ''),
+        cardBrand: brand,
+        expiry: newCardExpiry,
+        isDefault: savedPaymentMethods.length === 0,
+        addedAt: new Date().toISOString().split('T')[0]
+      };
+
+      setSavedPaymentMethods((prev) => [newPm, ...prev]);
+      if (addAuditLog && profile) {
+        addAuditLog('RIDER', `Linked new ${brandLabel} debit card (•••• ${last4}) for passenger ${profile.name}`);
+      }
+      setLinkStatusMsg({
+        type: 'success',
+        text: `✓ ${brandLabel} Card (•••• ${last4}) passed Luhn & NIBSS validation. Linked successfully!`
+      });
+      setTimeout(() => {
+        setIsLinkPaymentModalOpen(false);
+        setLinkStatusMsg(null);
+      }, 1600);
+    } else {
+      const bankVal = validateNigerianBankAccount({
+        bankCode: newBankCode,
+        accountNumber: newAccountNumber,
+        accountName: newAccountName
+      });
+
+      if (!bankVal.isValid) {
+        setLinkBankErrors(bankVal.errors);
+        const firstErr = Object.values(bankVal.errors)[0] || 'NUBAN format validation failed.';
+        setLinkStatusMsg({
+          type: 'error',
+          text: `NUBAN Account Error: ${firstErr}`
+        });
+        return;
+      }
+
+      setLinkBankErrors({});
+      const selectedBank = NIGERIAN_BANKS.find((b) => b.code === newBankCode);
+      const bankName = selectedBank ? selectedBank.name : 'Nigerian Bank';
+
+      const newPm = {
+        id: 'pm-' + Date.now(),
+        type: 'bank_account' as const,
+        title: `${bankName} NUBAN Account`,
+        details: `${newAccountNumber} • ${newAccountName.trim()}`,
+        bankCode: newBankCode,
+        bankName: bankName,
+        accountNumber: newAccountNumber.replace(/\D/g, ''),
+        accountName: newAccountName.trim(),
+        isDefault: savedPaymentMethods.length === 0,
+        addedAt: new Date().toISOString().split('T')[0]
+      };
+
+      setSavedPaymentMethods((prev) => [newPm, ...prev]);
+      if (addAuditLog && profile) {
+        addAuditLog('RIDER', `Linked NUBAN account ${newAccountNumber} (${bankName}) for passenger ${profile.name}`);
+      }
+      setLinkStatusMsg({
+        type: 'success',
+        text: `✓ NUBAN Account (${newAccountNumber} - ${bankName}) verified via NIBSS. Linked successfully!`
+      });
+      setTimeout(() => {
+        setIsLinkPaymentModalOpen(false);
+        setLinkStatusMsg(null);
+      }, 1600);
+    }
+  };
+
+  const handleRemovePaymentMethod = (id: string) => {
+    setSavedPaymentMethods((prev) => prev.filter((pm) => pm.id !== id));
+  };
+
+  const handleSetDefaultPaymentMethod = (id: string) => {
+    setSavedPaymentMethods((prev) => prev.map((pm) => ({ ...pm, isDefault: pm.id === id })));
   };
 
   // Transfer Fare Action Logic
@@ -499,6 +707,54 @@ export default function RiderPanel({
     if (!config) return;
 
     const estimatedPrice = getPrice(config.multiplier);
+    const currentBal = typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0;
+
+    // Payment Requirement Check: Schedule pickup is accessible only when payment is made
+    if (currentBal < estimatedPrice) {
+      setScheduleSuccessMsg(null);
+      setTransferStatusMsg({
+        type: 'error',
+        text: `Payment required to schedule pickup. You need ₦${estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} in your wallet balance, but current balance is ₦${currentBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Please top up your wallet to proceed.`
+      });
+      return;
+    }
+
+    // Process upfront payment deduction for scheduled ride
+    const newBalance = parseFloat((currentBal - estimatedPrice).toFixed(2));
+
+    if (setProfile) {
+      setProfile((prev) => ({
+        ...prev,
+        balance: newBalance
+      }));
+    }
+
+    if (setPassengers && profile) {
+      setPassengers((prevList) =>
+        prevList.map((p) => {
+          if (p.name === profile.name || p.id === profile.id) {
+            const updated = { ...p, balance: newBalance };
+            savePassengerToFirestore(updated);
+            return updated;
+          }
+          return p;
+        })
+      );
+    }
+
+    // Add wallet debit record
+    const paymentTx = {
+      id: 'tx-' + Math.random().toString(36).substr(2, 8),
+      type: 'transfer_out',
+      title: `Pre-paid Scheduled Ride (${scheduledDate} @ ${scheduledTime})`,
+      amount: -estimatedPrice,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'COMPLETED',
+      method: 'Wallet Pre-payment',
+      reference: `SCHED-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+    };
+    setTransactions((prev) => [paymentTx, ...prev]);
+
     const newRide: ScheduledRide = {
       id: 'sched-' + Math.random().toString(36).substring(2, 10),
       origin,
@@ -511,14 +767,17 @@ export default function RiderPanel({
       status: 'SCHEDULED',
       createdAt: new Date().toISOString(),
       notes: scheduledNote.trim() || undefined,
-      travelMode
+      travelMode,
+      isPaid: true,
+      paidAmount: estimatedPrice
     };
 
     setScheduledRides((prev) => [newRide, ...prev]);
-    setScheduleSuccessMsg(`Pickup successfully scheduled for ${newRide.scheduledDate} at ${newRide.scheduledTime}!`);
+    setTransferStatusMsg(null);
+    setScheduleSuccessMsg(`Payment of ₦${estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} confirmed! Pickup successfully scheduled for ${newRide.scheduledDate} at ${newRide.scheduledTime}.`);
     
     if (addAuditLog && profile) {
-      addAuditLog('RIDER', `Scheduled pickup for ${scheduledDate} @ ${scheduledTime} from ${origin.label} to ${destination.label}`);
+      addAuditLog('RIDER', `Scheduled pickup paid & confirmed (₦${estimatedPrice.toLocaleString()}) for ${scheduledDate} @ ${scheduledTime} from ${origin.label} to ${destination.label}`);
     }
 
     setScheduledNote('');
@@ -539,16 +798,59 @@ export default function RiderPanel({
 
     const config = VEHICLE_CONFIGS.find((v) => v.id === sched.vehicleType);
     const price = sched.estimatedPrice || (config ? getPrice(config.multiplier) : 3500);
-    onBookTrip(sched.vehicleType, price, distance || 8, duration || 15);
+    // Pass isPrepaid = true because payment was completed when scheduling
+    onBookTrip(sched.vehicleType, price, distance || 8, duration || 15, true);
     
     setActiveRiderSubTab('booking');
   };
 
   const handleCancelScheduledRide = (id: string) => {
+    const rideToCancel = scheduledRides.find((r) => r.id === id);
     setScheduledRides((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'CANCELLED' } : r))
     );
-    if (addAuditLog) {
+
+    // If the scheduled ride was paid, issue a full refund back to passenger wallet
+    if (rideToCancel && (rideToCancel.isPaid || (rideToCancel.paidAmount && rideToCancel.paidAmount > 0)) && rideToCancel.status === 'SCHEDULED') {
+      const refundAmt = rideToCancel.paidAmount || rideToCancel.estimatedPrice || 0;
+      if (refundAmt > 0) {
+        const currentBal = typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0;
+        const newBalance = parseFloat((currentBal + refundAmt).toFixed(2));
+
+        if (setProfile) {
+          setProfile((prev) => ({ ...prev, balance: newBalance }));
+        }
+
+        if (setPassengers && profile) {
+          setPassengers((prevList) =>
+            prevList.map((p) => {
+              if (p.name === profile.name || p.id === profile.id) {
+                const updated = { ...p, balance: newBalance };
+                savePassengerToFirestore(updated);
+                return updated;
+              }
+              return p;
+            })
+          );
+        }
+
+        const refundTx = {
+          id: 'tx-' + Math.random().toString(36).substr(2, 8),
+          type: 'transfer_in',
+          title: `Refund: Cancelled Scheduled Ride (${rideToCancel.scheduledDate} @ ${rideToCancel.scheduledTime})`,
+          amount: refundAmt,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'COMPLETED',
+          method: 'Wallet Refund',
+          reference: `REFUND-${id.substring(0, 8).toUpperCase()}`
+        };
+        setTransactions((prev) => [refundTx, ...prev]);
+
+        if (addAuditLog && profile) {
+          addAuditLog('RIDER', `Refunded ₦${refundAmt.toLocaleString()} to Passenger ${profile.name} for cancelled scheduled ride #${id}`);
+        }
+      }
+    } else if (addAuditLog) {
       addAuditLog('RIDER', `Cancelled scheduled ride reservation #${id}`);
     }
   };
@@ -1168,6 +1470,7 @@ export default function RiderPanel({
                   )}
                 </div>
 
+                {/* Wallet Balance & Payment Status */}
                 <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-zinc-800">
@@ -1180,35 +1483,61 @@ export default function RiderPanel({
                   </div>
                   {(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0) < getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1) ? (
                     <div className="flex items-center justify-between text-xs bg-amber-50 p-2 rounded-lg border border-amber-200 text-amber-900 font-bold">
-                      <span>⚠️ Low wallet balance for this ride</span>
+                      <span>⚠️ Insufficient wallet balance for this ride (Fare: ₦{getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1).toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
                       <button
                         type="button"
                         onClick={() => {
                           setActiveRiderSubTab('wallet');
                           setWalletSubSection('deposit');
                         }}
-                        className="text-[10px] bg-emerald-700 text-white px-2.5 py-1 rounded-md font-extrabold cursor-pointer hover:bg-emerald-800"
+                        className="text-[10px] bg-emerald-700 text-white px-2.5 py-1 rounded-md font-extrabold cursor-pointer hover:bg-emerald-800 shrink-0 ml-1"
                       >
                         Top Up Wallet
                       </button>
                     </div>
                   ) : (
                     <div className="text-[10px] text-emerald-800 font-bold flex items-center justify-between">
-                      <span>✓ Auto-deducted from Passenger Wallet</span>
-                      <span className="text-zinc-600 font-normal">Promo Active</span>
+                      <span>✓ {bookingTiming === 'schedule' ? 'Pre-payment will be debited from Wallet' : 'Auto-deducted from Passenger Wallet'}</span>
+                      <span className="text-zinc-600 font-normal">Instant Deduction</span>
                     </div>
                   )}
                 </div>
+
+                {transferStatusMsg && transferStatusMsg.type === 'error' && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl text-xs font-bold space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                      <span>{transferStatusMsg.text}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveRiderSubTab('wallet');
+                        setWalletSubSection('deposit');
+                      }}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-2 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <Wallet size={14} /> Deposit Funds to Pay & Schedule
+                    </button>
+                  </div>
+                )}
 
                 {bookingTiming === 'schedule' ? (
                   <button
                     type="button"
                     onClick={handleScheduleRideSubmit}
-                    className="w-full bg-emerald-700 text-white font-extrabold py-3.5 rounded-xl hover:bg-emerald-800 transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer"
+                    className={`w-full font-black py-3.5 rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-md cursor-pointer ${
+                      (typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0) >= getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1)
+                        ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 text-white'
+                    }`}
                     id="schedule-ride-btn"
                   >
                     <CalendarClock size={16} />
-                    Schedule Pickup for {scheduledDate} @ {scheduledTime}
+                    {(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0) >= getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1)
+                      ? `Pay ₦${getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1).toLocaleString(undefined, { minimumFractionDigits: 2 })} & Schedule Pickup`
+                      : `Pay ₦${getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Requires Top Up)`
+                    }
                   </button>
                 ) : (
                   <button
@@ -1263,44 +1592,57 @@ export default function RiderPanel({
               </div>
 
               {/* Quick Sub-navigation */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/80">
+              <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-zinc-800/80">
                 <button
                   type="button"
                   onClick={() => setWalletSubSection('deposit')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition cursor-pointer ${
                     walletSubSection === 'deposit'
                       ? 'bg-emerald-500 text-zinc-950 shadow-md'
                       : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
                   }`}
                   id="wallet-sub-deposit"
                 >
-                  <Plus size={14} />
+                  <Plus size={13} />
                   Deposit
                 </button>
                 <button
                   type="button"
+                  onClick={() => setWalletSubSection('methods')}
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition cursor-pointer ${
+                    walletSubSection === 'methods'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
+                  }`}
+                  id="wallet-sub-methods"
+                >
+                  <CreditCard size={13} />
+                  Methods
+                </button>
+                <button
+                  type="button"
                   onClick={() => setWalletSubSection('transfer')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition cursor-pointer ${
                     walletSubSection === 'transfer'
                       ? 'bg-emerald-500 text-zinc-950 shadow-md'
                       : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
                   }`}
                   id="wallet-sub-transfer"
                 >
-                  <ArrowLeftRight size={14} />
+                  <ArrowLeftRight size={13} />
                   Transfer
                 </button>
                 <button
                   type="button"
                   onClick={() => setWalletSubSection('history')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition cursor-pointer ${
                     walletSubSection === 'history'
                       ? 'bg-emerald-500 text-zinc-950 shadow-md'
                       : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200'
                   }`}
                   id="wallet-sub-history"
                 >
-                  <History size={14} />
+                  <History size={13} />
                   History
                 </button>
               </div>
@@ -1487,32 +1829,66 @@ export default function RiderPanel({
                 {depositMethod === 'card' && (
                   <form onSubmit={handleDepositSubmit} className="space-y-3 pt-1">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Card Number</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Card Number</label>
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-900 text-emerald-400 font-mono">
+                          {detectCardBrand(cardNo).toUpperCase()} CARD
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={cardNo}
                         onChange={(e) => setCardNo(e.target.value)}
-                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                        placeholder="e.g. 5061 2222 3333 4444"
+                        className={`w-full bg-white border ${cardErrors.cardNumber ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
                       />
+                      {cardErrors.cardNumber && (
+                        <p className="text-[10px] font-bold text-rose-600 flex items-center gap-1 mt-0.5">
+                          <AlertCircle size={12} /> {cardErrors.cardNumber}
+                        </p>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">Expiry</label>
                         <input
                           type="text"
                           value={cardExpiry}
                           onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                          placeholder="MM/YY"
+                          className={`w-full bg-white border ${cardErrors.expiry ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
                         />
+                        {cardErrors.expiry && (
+                          <p className="text-[9px] font-bold text-rose-600 mt-0.5">{cardErrors.expiry}</p>
+                        )}
                       </div>
                       <div>
                         <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">CVV</label>
                         <input
                           type="password"
+                          maxLength={4}
                           value={cardCvv}
                           onChange={(e) => setCardCvv(e.target.value)}
-                          className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none"
+                          placeholder="123"
+                          className={`w-full bg-white border ${cardErrors.cvv ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
                         />
+                        {cardErrors.cvv && (
+                          <p className="text-[9px] font-bold text-rose-600 mt-0.5">{cardErrors.cvv}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">ATM PIN</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={cardPin}
+                          onChange={(e) => setCardPin(e.target.value)}
+                          placeholder="****"
+                          className={`w-full bg-white border ${cardErrors.pin ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
+                        />
+                        {cardErrors.pin && (
+                          <p className="text-[9px] font-bold text-rose-600 mt-0.5">{cardErrors.pin}</p>
+                        )}
                       </div>
                     </div>
                     <div>
@@ -1598,6 +1974,105 @@ export default function RiderPanel({
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* SECTION 1.5: LINKED NIGERIAN PAYMENT METHODS */}
+            {walletSubSection === 'methods' && (
+              <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-4">
+                <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+                  <div>
+                    <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider flex items-center gap-2">
+                      <CreditCard size={15} className="text-emerald-700" />
+                      Saved Payment Methods
+                    </h4>
+                    <span className="text-[10px] text-zinc-500 font-medium">Verified via CBN & NIBSS Format Rules</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLinkPaymentModalOpen(true);
+                      setLinkStatusMsg(null);
+                    }}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    id="link-new-payment-method-btn"
+                  >
+                    <Plus size={14} /> Link New Method
+                  </button>
+                </div>
+
+                {savedPaymentMethods.length === 0 ? (
+                  <div className="bg-white p-6 rounded-xl border border-dashed border-[#E5DFD3] text-center space-y-2">
+                    <CreditCard size={28} className="mx-auto text-zinc-400" />
+                    <p className="text-xs font-bold text-zinc-700">No linked payment methods found.</p>
+                    <p className="text-[10px] text-zinc-500">Link a Nigerian debit card or 10-digit NUBAN bank account for seamless 1-click ride payments.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {savedPaymentMethods.map((pm) => (
+                      <div
+                        key={pm.id}
+                        className={`bg-white p-3.5 rounded-xl border transition flex items-center justify-between ${
+                          pm.isDefault ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-[#E5DFD3]'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            pm.type === 'card' ? 'bg-zinc-900 text-emerald-400 font-mono text-[10px] font-black' : 'bg-emerald-100 text-emerald-800 font-bold'
+                          }`}>
+                            {pm.type === 'card' ? (pm.cardBrand?.toUpperCase() || 'CARD') : <Building2 size={18} />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-zinc-900">{pm.title}</span>
+                              {pm.isDefault && (
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full uppercase">
+                                  Default Method
+                                </span>
+                              )}
+                              <span className="text-[9px] bg-zinc-100 text-zinc-600 font-bold px-1.5 py-0.5 rounded border border-zinc-200 flex items-center gap-1">
+                                <ShieldCheck size={10} className="text-emerald-600" /> CBN Validated
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-mono font-bold text-zinc-600 mt-0.5">{pm.details}</p>
+                            <span className="text-[9px] text-zinc-400">Linked on {pm.addedAt}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {!pm.isDefault && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetDefaultPaymentMethod(pm.id)}
+                              className="text-[10px] font-extrabold text-emerald-700 hover:text-emerald-900 px-2 py-1 rounded-md hover:bg-emerald-50 cursor-pointer"
+                            >
+                              Set Default
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePaymentMethod(pm.id)}
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition"
+                            title="Remove Payment Method"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Validation Layer Info Box */}
+                <div className="bg-emerald-950 text-white p-3.5 rounded-xl border border-emerald-500/30 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+                    <span className="text-xs font-black text-emerald-300">Nigerian Banking Format Validation Layer</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-300 leading-relaxed font-medium">
+                    All linked cards must pass 16/19-digit NIBSS Luhn checksum, valid expiration dates, CVV, and 4-digit ATM PIN. Bank accounts require standard 10-digit NUBAN numbers issued by CBN-licensed institutions.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1849,7 +2324,12 @@ export default function RiderPanel({
                             )}
                           </div>
 
-                          <div>
+                          <div className="flex items-center gap-1.5">
+                            {ride.isPaid && isUpcoming && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                                <CheckCircle2 size={11} className="text-emerald-700" /> Pre-paid
+                              </span>
+                            )}
                             {isUpcoming && (
                               <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
                                 Scheduled
@@ -1862,7 +2342,7 @@ export default function RiderPanel({
                             )}
                             {isCancelled && (
                               <span className="text-[10px] bg-rose-100 text-rose-900 border border-rose-300 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
-                                Cancelled
+                                Cancelled & Refunded
                               </span>
                             )}
                           </div>
@@ -1907,8 +2387,15 @@ export default function RiderPanel({
                           </div>
 
                           <div className="text-right">
-                            <span className="text-[10px] font-bold text-zinc-500 uppercase block">Est. Fare</span>
-                            <span className="text-sm font-black text-emerald-800">₦{(ride.estimatedPrice || 3500).toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase block">
+                              {isCancelled ? 'Refunded Fare' : 'Pre-paid Fare'}
+                            </span>
+                            <span className="text-sm font-black text-emerald-800">
+                              ₦{(ride.paidAmount || ride.estimatedPrice || 3500).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-[9px] text-emerald-700 font-extrabold block">
+                              {isCancelled ? '✓ Returned to Wallet' : '✓ Paid via Wallet'}
+                            </span>
                           </div>
                         </div>
 
@@ -2476,6 +2963,256 @@ export default function RiderPanel({
           }
         }}
       />
+
+      {/* LINK NIGERIAN PAYMENT METHOD MODAL */}
+      {isLinkPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-[#E5DFD3] shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto relative">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-900">Link Nigerian Payment Method</h3>
+                  <p className="text-[10px] text-zinc-500 font-medium">Enforces CBN & NIBSS Standard Format Rules</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLinkPaymentModalOpen(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-800 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Method Type Selector */}
+            <div className="grid grid-cols-2 gap-2 bg-zinc-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkMethodType('card');
+                  setLinkStatusMsg(null);
+                }}
+                className={`py-2 text-xs font-black rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  linkMethodType === 'card' ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <CreditCard size={14} /> Debit / Credit Card
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkMethodType('bank_account');
+                  setLinkStatusMsg(null);
+                }}
+                className={`py-2 text-xs font-black rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  linkMethodType === 'bank_account' ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <Building2 size={14} /> Bank Account (NUBAN)
+              </button>
+            </div>
+
+            {linkStatusMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs font-bold flex items-start gap-2 shadow-xs ${
+                  linkStatusMsg.type === 'success'
+                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    : 'bg-rose-100 text-rose-900 border border-rose-300'
+                }`}
+              >
+                {linkStatusMsg.type === 'success' ? (
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />
+                )}
+                <span>{linkStatusMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLinkPaymentMethod} className="space-y-3">
+              {linkMethodType === 'card' ? (
+                <>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                      Cardholder Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newCardHolder}
+                      onChange={(e) => setNewCardHolder(e.target.value)}
+                      placeholder="e.g. Ashiru Shehu"
+                      className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-bold text-zinc-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
+                        Card Number
+                      </label>
+                      <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 text-emerald-400">
+                        {detectCardBrand(newCardNo).toUpperCase()} CARD
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={newCardNo}
+                      onChange={(e) => setNewCardNo(e.target.value)}
+                      placeholder="e.g. 5061 2222 3333 4444 (Verve) or 4111..."
+                      className={`w-full bg-white border ${linkCardErrors.cardNumber ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
+                    />
+                    {linkCardErrors.cardNumber && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {linkCardErrors.cardNumber}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                        Expiry
+                      </label>
+                      <input
+                        type="text"
+                        value={newCardExpiry}
+                        onChange={(e) => setNewCardExpiry(e.target.value)}
+                        placeholder="08/28"
+                        className={`w-full bg-white border ${linkCardErrors.expiry ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
+                      />
+                      {linkCardErrors.expiry && (
+                        <p className="text-[9px] font-bold text-rose-600 mt-0.5">{linkCardErrors.expiry}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                        CVV
+                      </label>
+                      <input
+                        type="password"
+                        maxLength={4}
+                        value={newCardCvv}
+                        onChange={(e) => setNewCardCvv(e.target.value)}
+                        placeholder="123"
+                        className={`w-full bg-white border ${linkCardErrors.cvv ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
+                      />
+                      {linkCardErrors.cvv && (
+                        <p className="text-[9px] font-bold text-rose-600 mt-0.5">{linkCardErrors.cvv}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                        ATM PIN
+                      </label>
+                      <input
+                        type="password"
+                        maxLength={4}
+                        value={newCardPin}
+                        onChange={(e) => setNewCardPin(e.target.value)}
+                        placeholder="****"
+                        className={`w-full bg-white border ${linkCardErrors.pin ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-zinc-900 outline-none`}
+                      />
+                      {linkCardErrors.pin && (
+                        <p className="text-[9px] font-bold text-rose-600 mt-0.5">{linkCardErrors.pin}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                      Select CBN Licensed Bank
+                    </label>
+                    <select
+                      value={newBankCode}
+                      onChange={(e) => setNewBankCode(e.target.value)}
+                      className={`w-full bg-white border ${linkBankErrors.bankCode ? 'border-rose-500' : 'border-[#E5DFD3]'} rounded-xl px-3.5 py-2.5 text-xs font-bold text-zinc-900 outline-none cursor-pointer`}
+                    >
+                      {NIGERIAN_BANKS.map((bank) => (
+                        <option key={bank.code} value={bank.code}>
+                          {bank.name} (Code: {bank.code})
+                        </option>
+                      ))}
+                    </select>
+                    {linkBankErrors.bankCode && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1">{linkBankErrors.bankCode}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                      10-Digit NUBAN Account Number
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      value={newAccountNumber}
+                      onChange={(e) => setNewAccountNumber(e.target.value)}
+                      placeholder="e.g. 3098172654"
+                      className={`w-full bg-white border ${linkBankErrors.accountNumber ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-3.5 py-2 text-xs font-mono font-extrabold text-zinc-900 outline-none`}
+                    />
+                    {linkBankErrors.accountNumber && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {linkBankErrors.accountNumber}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block mb-1">
+                      Account Holder Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newAccountName}
+                      onChange={(e) => setNewAccountName(e.target.value)}
+                      placeholder="e.g. Ashiru Shehu"
+                      className={`w-full bg-white border ${linkBankErrors.accountName ? 'border-rose-500 bg-rose-50/20' : 'border-[#E5DFD3]'} rounded-xl px-3.5 py-2 text-xs font-bold text-zinc-900 outline-none`}
+                    />
+                    {linkBankErrors.accountName && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1">{linkBankErrors.accountName}</p>
+                    )}
+                  </div>
+
+                  {/* Dynamic NIBSS Account Resolution Preview */}
+                  {newBankCode && newAccountNumber.replace(/\D/g, '').length === 10 && (
+                    <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="block text-[10px] uppercase font-extrabold text-emerald-700">✓ NIBSS Switch Instant Verification</span>
+                        <span>{newAccountName || 'Verified Account Holder'} ({NIGERIAN_BANKS.find(b => b.code === newBankCode)?.name || 'Commercial Bank'})</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLinkPaymentModalOpen(false)}
+                  className="w-1/3 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-extrabold py-3 rounded-xl text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3 rounded-xl text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  id="submit-link-payment-btn"
+                >
+                  <ShieldCheck size={16} /> Verify & Link Method
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
