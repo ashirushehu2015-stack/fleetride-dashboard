@@ -52,7 +52,10 @@ export type TripStatus =
   | 'ARRIVED'
   | 'TRIP_IN_PROGRESS'
   | 'COMPLETED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'PENDING'
+  | 'Pending'
+  | 'SCHEDULED';
 
 export interface Trip {
   id: string;
@@ -76,6 +79,10 @@ export interface Trip {
   passengerAvatar?: string;
   passengerRating?: number;
   isPrepaid?: boolean;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  notes?: string;
+  travelMode?: 'municipal' | 'interstate';
 }
 
 export interface ChatMessage {
@@ -94,6 +101,11 @@ export interface UserProfile {
   avatar: string;
   role: 'rider' | 'driver' | 'admin';
   id?: string;
+  vehicleType?: VehicleType;
+  vehicleName?: string;
+  plateNumber?: string;
+  phone?: string;
+  completedTrips?: number;
 }
 
 export interface UserFeedback {

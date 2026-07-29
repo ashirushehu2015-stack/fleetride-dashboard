@@ -5,7 +5,7 @@ import { QrPaymentModal } from './QrPaymentModal';
 import { TripSummaryReceiptModal } from './TripSummaryReceiptModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
-import { savePassengerToFirestore } from '../firebase';
+import { savePassengerToFirestore, saveTripToFirestore } from '../firebase';
 import {
   NIGERIAN_BANKS,
   validateNigerianCard,
@@ -91,6 +91,7 @@ interface RiderPanelProps {
   setPassengers?: React.Dispatch<React.SetStateAction<any[]>>;
   addAuditLog?: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
   onReplayTrip?: (trip: Trip) => void;
+  allTrips?: Trip[];
 }
 
 export default function RiderPanel({
@@ -117,6 +118,7 @@ export default function RiderPanel({
   setPassengers,
   addAuditLog,
   onReplayTrip,
+  allTrips,
 }: RiderPanelProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<string>('X');
   const [distance, setDistance] = useState<number>(0);
@@ -143,6 +145,52 @@ export default function RiderPanel({
   const [scheduledTime, setScheduledTime] = useState<string>('08:30');
   const [scheduledNote, setScheduledNote] = useState<string>('');
   const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+  
+  // Reschedule Modal State
+  const [rescheduleRide, setRescheduleRide] = useState<ScheduledRide | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>('');
+  const [rescheduleTime, setRescheduleTime] = useState<string>('08:30');
+  const [rescheduleNotes, setRescheduleNotes] = useState<string>('');
+
+  // Sync Firebase pending trips into scheduledRides
+  useEffect(() => {
+    if (!allTrips || allTrips.length === 0) return;
+    const pendingRemoteTrips = allTrips.filter(
+      (t) => t.status === 'Pending' || (t.status === 'SCHEDULED' && t.passengerName === profile?.name)
+    );
+
+    if (pendingRemoteTrips.length > 0) {
+      setScheduledRides((prev) => {
+        const updated = [...prev];
+        pendingRemoteTrips.forEach((pt) => {
+          const existingIdx = updated.findIndex((r) => r.id === pt.id);
+          const mappedRide: ScheduledRide = {
+            id: pt.id,
+            origin: pt.origin,
+            destination: pt.destination,
+            vehicleType: pt.vehicleType || 'X',
+            estimatedPrice: pt.price || 3500,
+            scheduledDate: pt.scheduledDate || pt.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0],
+            scheduledTime: pt.scheduledTime || '08:30',
+            scheduledTimestamp: `${pt.scheduledDate || pt.timestamp?.split('T')[0] || ''}T${pt.scheduledTime || '08:30'}:00`,
+            status: pt.status === 'Pending' ? 'SCHEDULED' : (pt.status as any),
+            createdAt: pt.timestamp,
+            notes: pt.notes || '',
+            travelMode: pt.travelMode || 'municipal',
+            isPaid: true,
+            paidAmount: pt.price || 3500
+          };
+
+          if (existingIdx >= 0) {
+            updated[existingIdx] = { ...updated[existingIdx], ...mappedRide };
+          } else {
+            updated.unshift(mappedRide);
+          }
+        });
+        return updated;
+      });
+    }
+  }, [allTrips, profile?.name]);
   
   const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>(() => {
     const saved = localStorage.getItem('zamfara_scheduled_rides');
@@ -823,15 +871,110 @@ export default function RiderPanel({
       paidAmount: estimatedPrice
     };
 
+    // Store as 'Pending' trip in Firebase Database
+    const tripId = 'trip-' + Math.random().toString(36).substring(2, 10);
+    const pendingTrip: Trip = {
+      id: tripId,
+      origin,
+      destination,
+      vehicleType: selectedVehicle,
+      price: estimatedPrice,
+      distanceMiles: distance,
+      durationMinutes: duration,
+      predictedDurationMinutes: duration,
+      driver: {
+        name: 'Pending Driver Assignment',
+        rating: 5.0,
+        vehicleType: selectedVehicle,
+        vehicleName: 'ZamTaxi Scheduled Fleet',
+        plateNumber: 'PENDING',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+        phone: '+234 800 000 0000',
+        completedTrips: 0
+      },
+      status: 'Pending',
+      progress: 0,
+      routePoints: [],
+      currentPosition: origin,
+      timestamp: new Date().toISOString(),
+      passengerName: profile?.name || 'Rider',
+      passengerAvatar: profile?.avatar,
+      passengerRating: profile?.rating || 5.0,
+      isPrepaid: true,
+      scheduledDate: scheduledDate || new Date().toISOString().split('T')[0],
+      scheduledTime: scheduledTime || '08:00',
+      notes: scheduledNote.trim() || undefined
+    };
+
+    saveTripToFirestore(pendingTrip);
+
     setScheduledRides((prev) => [newRide, ...prev]);
     setTransferStatusMsg(null);
-    setScheduleSuccessMsg(`Payment of ₦${estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} confirmed! Pickup successfully scheduled for ${newRide.scheduledDate} at ${newRide.scheduledTime}.`);
+    setScheduleSuccessMsg(`Payment of ₦${estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} confirmed! Scheduled trip stored in Firebase database as 'Pending' for pickup on ${newRide.scheduledDate} at ${newRide.scheduledTime}.`);
     
     if (addAuditLog && profile) {
-      addAuditLog('RIDER', `Scheduled pickup paid & confirmed (₦${estimatedPrice.toLocaleString()}) for ${scheduledDate} @ ${scheduledTime} from ${origin.label} to ${destination.label}`);
+      addAuditLog('RIDER', `Scheduled pickup paid & stored in Firebase as Pending (₦${estimatedPrice.toLocaleString()}) for ${scheduledDate} @ ${scheduledTime} from ${origin.label} to ${destination.label}`);
     }
 
     setScheduledNote('');
+  };
+
+  const handleOpenRescheduleModal = (ride: ScheduledRide) => {
+    setRescheduleRide(ride);
+    setRescheduleDate(ride.scheduledDate || new Date().toISOString().split('T')[0]);
+    setRescheduleTime(ride.scheduledTime || '08:30');
+    setRescheduleNotes(ride.notes || '');
+  };
+
+  const handleConfirmReschedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rescheduleRide) return;
+
+    const updatedDate = rescheduleDate;
+    const updatedTime = rescheduleTime;
+    const updatedNotes = rescheduleNotes;
+
+    // 1. Update local scheduledRides state
+    setScheduledRides((prev) =>
+      prev.map((r) =>
+        r.id === rescheduleRide.id
+          ? {
+              ...r,
+              scheduledDate: updatedDate,
+              scheduledTime: updatedTime,
+              notes: updatedNotes,
+              scheduledTimestamp: `${updatedDate}T${updatedTime}:00`
+            }
+          : r
+      )
+    );
+
+    // 2. Update Firestore if trip document exists
+    const matchingTrip = allTrips?.find(
+      (t) =>
+        t.id === rescheduleRide.id ||
+        (t.origin?.label === rescheduleRide.origin.label &&
+          t.destination?.label === rescheduleRide.destination.label &&
+          (t.status === 'Pending' || t.status === 'SCHEDULED'))
+    );
+
+    if (matchingTrip) {
+      const updatedTrip: Trip = {
+        ...matchingTrip,
+        scheduledDate: updatedDate,
+        scheduledTime: updatedTime,
+        notes: updatedNotes,
+        timestamp: new Date().toISOString()
+      };
+      saveTripToFirestore(updatedTrip);
+    }
+
+    setScheduleSuccessMsg(`Pickup successfully rescheduled for ${updatedDate} at ${updatedTime}! Updated in Firebase database.`);
+    if (addAuditLog) {
+      addAuditLog('RIDER', `Rescheduled pickup #${rescheduleRide.id} to ${updatedDate} @ ${updatedTime}`);
+    }
+
+    setRescheduleRide(null);
   };
 
   const handleDispatchScheduledRide = (sched: ScheduledRide) => {
@@ -860,6 +1003,23 @@ export default function RiderPanel({
     setScheduledRides((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'CANCELLED' } : r))
     );
+
+    // Also update matching Firestore trip document to status CANCELLED
+    if (rideToCancel) {
+      const matchingTrip = allTrips?.find(
+        (t) =>
+          t.id === id ||
+          (t.origin?.label === rideToCancel.origin.label &&
+            t.destination?.label === rideToCancel.destination.label)
+      );
+      if (matchingTrip) {
+        saveTripToFirestore({
+          ...matchingTrip,
+          status: 'CANCELLED',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
     // If the scheduled ride was paid, issue a full refund back to passenger wallet
     if (rideToCancel && (rideToCancel.isPaid || (rideToCancel.paidAmount && rideToCancel.paidAmount > 0)) && rideToCancel.status === 'SCHEDULED') {
@@ -2577,6 +2737,14 @@ export default function RiderPanel({
                             <>
                               <button
                                 type="button"
+                                onClick={() => handleOpenRescheduleModal(ride)}
+                                className="px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#F2EDE4] text-zinc-900 border border-[#E5DFD3] rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                id={`reschedule-btn-${ride.id}`}
+                              >
+                                <CalendarClock size={13} className="text-emerald-700" /> Reschedule
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleCancelScheduledRide(ride.id)}
                                 className="px-3 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-extrabold transition cursor-pointer"
                               >
@@ -3337,6 +3505,103 @@ export default function RiderPanel({
                   id="submit-link-payment-btn"
                 >
                   <ShieldCheck size={16} /> Verify & Link Method
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Modal */}
+      {rescheduleRide && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-[#E5DFD3] rounded-3xl max-w-md w-full overflow-hidden shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#F2EDE4] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <CalendarClock size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-900">Reschedule Pickup</h3>
+                  <p className="text-[11px] text-zinc-500 font-medium">Update date, time, or rider notes</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRescheduleRide(null)}
+                className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-500 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReschedule} className="space-y-4">
+              <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD3] space-y-1">
+                <span className="text-[9px] uppercase font-extrabold text-zinc-400 block">Itinerary</span>
+                <span className="text-xs font-black text-zinc-900 block truncate">
+                  {rescheduleRide.origin.label} ➔ {rescheduleRide.destination.label}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block">
+                    New Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 outline-none"
+                    id="reschedule-date-input"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block">
+                    New Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-zinc-900 outline-none"
+                    id="reschedule-time-input"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block">
+                  Driver Notes / Special Request
+                </label>
+                <input
+                  type="text"
+                  value={rescheduleNotes}
+                  onChange={(e) => setRescheduleNotes(e.target.value)}
+                  placeholder="e.g. Airport terminal connection. Extra luggage."
+                  className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 outline-none"
+                  id="reschedule-notes-input"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRescheduleRide(null)}
+                  className="w-1/3 py-2.5 rounded-xl border border-[#E5DFD3] text-zinc-700 font-bold text-xs hover:bg-[#F2EDE4] transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  id="confirm-reschedule-btn"
+                >
+                  <CheckCircle2 size={16} /> Confirm New Time
                 </button>
               </div>
             </form>

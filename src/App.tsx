@@ -1114,6 +1114,7 @@ export default function App() {
                 setPassengers={setPassengers}
                 addAuditLog={addAuditLog}
                 onReplayTrip={handleReplayTrip}
+                allTrips={completedTrips}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">
@@ -1138,6 +1139,7 @@ export default function App() {
                 isDriverOnline={isDriverOnline}
                 setIsDriverOnline={setIsDriverOnline}
                 onReplayTrip={handleReplayTrip}
+                allTrips={completedTrips}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">

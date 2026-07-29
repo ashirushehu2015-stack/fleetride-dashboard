@@ -845,23 +845,42 @@ export default function UserManagementDisplayScreen({
             {subTab === 'trips' && (
               <div className="space-y-3">
                 <h3 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider border-b border-[#E5DFD3] pb-2 flex items-center justify-between">
-                  <span>State Completed Trips Logs</span>
+                  <span>State Trips & Scheduled Pickups Log</span>
                   <span className="text-zinc-500 font-mono text-[10px]">{completedTrips.length} Records</span>
                 </h3>
 
                 <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
-                  {completedTrips.slice().reverse().map((trip) => (
-                    <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-extrabold text-zinc-900">{trip.driver.name} ({trip.vehicleType})</div>
-                        <div className="text-[10px] text-zinc-600 font-bold">{trip.origin.label} → {trip.destination.label}</div>
+                  {completedTrips.slice().reverse().map((trip) => {
+                    const isPending = trip.status === 'Pending' || trip.status === 'SCHEDULED';
+                    return (
+                      <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-zinc-900">{trip.driver?.name || 'Pending Assignment'} ({trip.vehicleType || 'EV'})</span>
+                            {isPending ? (
+                              <span className="text-[9px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.5 rounded border border-amber-300">
+                                SCHEDULED PENDING
+                              </span>
+                            ) : (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-900 font-black px-1.5 py-0.5 rounded border border-emerald-300 uppercase">
+                                {trip.status || 'COMPLETED'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-600 font-bold">{trip.origin.label} → {trip.destination.label}</div>
+                          {trip.scheduledDate && (
+                            <div className="text-[9.5px] text-emerald-800 font-bold mt-0.5">
+                              📅 Pickup: {trip.scheduledDate} @ {trip.scheduledTime || '08:30'} {trip.notes ? `• "${trip.notes}"` : ''}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                          <div className="text-[9px] text-zinc-500 font-mono">{trip.distanceMiles}km • {trip.durationMinutes}m</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <div className="text-[9px] text-zinc-500 font-mono">{trip.distanceMiles}km • {trip.durationMinutes}m</div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

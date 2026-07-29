@@ -66,13 +66,32 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
   const predictedDuration = trip.predictedDurationMinutes ?? Math.max(1, Math.round(actualDuration * 0.72));
   const delayMinutes = Math.max(0, actualDuration - predictedDuration);
 
+  // Compute Trip Start and End Timestamps
+  const endTimeMs = trip.timestamp ? new Date(trip.timestamp).getTime() : Date.now();
+  const startTimeMs = endTimeMs - actualDuration * 60 * 1000;
+
+  const startTimeObj = new Date(startTimeMs);
+  const endTimeObj = new Date(endTimeMs);
+
+  const startTimeFormatted = startTimeObj.toLocaleTimeString('en-NG', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  const endTimeFormatted = endTimeObj.toLocaleTimeString('en-NG', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleShare = () => {
     if (navigator.clipboard) {
-      const summaryText = `ZamTaxi Trip Receipt (${receiptRef})\nFrom: ${trip.origin.label}\nTo: ${trip.destination.label}\nPredicted ETA: ${predictedDuration} mins\nActual Time: ${actualDuration} mins (${delayMinutes > 0 ? `+${delayMinutes}m peak traffic delay` : 'on time'})\nTotal: ₦${totalCharged.toLocaleString()}\nStatus: COMPLETED`;
+      const summaryText = `ZamTaxi Trip Receipt (${receiptRef})\nDriver: ${trip.driver.name}\nPlate Number: ${trip.driver.plateNumber}\nFrom: ${trip.origin.label}\nTo: ${trip.destination.label}\nStart Time: ${startTimeFormatted}\nEnd Time: ${endTimeFormatted}\nActual Duration: ${actualDuration} mins (${delayMinutes > 0 ? `+${delayMinutes}m traffic delay` : 'on time'})\nTotal Fare: ₦${totalCharged.toLocaleString()}\nStatus: COMPLETED`;
       navigator.clipboard.writeText(summaryText);
       alert('Trip receipt summary copied to clipboard!');
     }
@@ -259,28 +278,67 @@ export const TripSummaryReceiptModal: React.FC<TripSummaryReceiptModalProps> = (
           </div>
 
           {/* Driver & Vehicle Details */}
-          <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img
-                src={trip.driver.avatar}
-                alt={trip.driver.name}
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xs shrink-0"
-                referrerPolicy="no-referrer"
-              />
-              <div>
-                <h4 className="font-black text-xs text-zinc-900">{trip.driver.name}</h4>
-                <div className="flex items-center gap-1 text-[11px] text-zinc-600 font-semibold">
-                  <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
-                  <span>{trip.driver.rating.toFixed(2)} rating</span>
-                </div>
-              </div>
+          <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-2.5">
+            <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+              <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1.5">
+                <Car size={13} className="text-zinc-700" /> Assigned Driver & Vehicle
+              </span>
+              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                Verified Partner
+              </span>
             </div>
 
-            <div className="text-right">
-              <span className="text-[10px] font-black bg-zinc-900 text-white px-2 py-0.5 rounded uppercase">
-                {trip.driver.plateNumber}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img
+                  src={trip.driver.avatar}
+                  alt={trip.driver.name}
+                  className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xs shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-zinc-400 block">Driver Name</span>
+                  <h4 className="font-black text-xs text-zinc-900">{trip.driver.name}</h4>
+                  <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-semibold mt-0.5">
+                    <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
+                    <span>{trip.driver.rating.toFixed(2)} rating</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block">Plate Number</span>
+                <span className="text-xs font-black font-mono bg-zinc-900 text-white px-2.5 py-1 rounded-md uppercase tracking-wider inline-block">
+                  {trip.driver.plateNumber}
+                </span>
+                <p className="text-[10px] font-extrabold text-zinc-600 mt-1">{trip.driver.vehicleName}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trip Start & End Timestamps Record */}
+          <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-2.5">
+            <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+              <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1.5">
+                <Clock size={13} className="text-zinc-700" /> Trip Timestamps Log
               </span>
-              <p className="text-[11px] font-bold text-zinc-600 mt-1">{trip.driver.vehicleName}</p>
+              <span className="text-[10px] font-mono font-bold text-zinc-500">
+                {dateFormatted}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white p-3 rounded-xl border border-[#E5DFD3]">
+                <span className="text-[9px] uppercase font-extrabold text-zinc-400 block">Trip Start Time</span>
+                <span className="text-sm font-black text-zinc-900 font-mono block mt-0.5">{startTimeFormatted}</span>
+                <span className="text-[9px] text-zinc-500 block mt-1">Pickup / Departure</span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-[#E5DFD3]">
+                <span className="text-[9px] uppercase font-extrabold text-zinc-400 block">Trip End Time</span>
+                <span className="text-sm font-black text-emerald-700 font-mono block mt-0.5">{endTimeFormatted}</span>
+                <span className="text-[9px] text-zinc-500 block mt-1">Drop-off / Arrived</span>
+              </div>
             </div>
           </div>
 

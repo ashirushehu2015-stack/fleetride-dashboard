@@ -4,6 +4,7 @@ import SafetyToolkitModal from './SafetyToolkitModal';
 import DriverOnboardingModal from './DriverOnboardingModal';
 import { UserProfile, Location, Trip } from '../types';
 import { MOCK_PASSENGERS } from '../data';
+import { saveTripToFirestore } from '../firebase';
 import {
   ResponsiveContainer,
   BarChart,
@@ -40,7 +41,9 @@ import {
   LineChart,
   Calendar,
   DollarSign,
-  Zap
+  Zap,
+  CalendarClock,
+  CheckCircle2
 } from 'lucide-react';
 
 interface DriverPanelProps {
@@ -68,6 +71,8 @@ interface DriverPanelProps {
   isDriverOnline?: boolean;
   setIsDriverOnline?: (online: boolean) => void;
   onReplayTrip?: (trip: Trip) => void;
+  allTrips?: Trip[];
+  addAuditLog?: (category: 'SYSTEM' | 'ADMIN' | 'DRIVER' | 'RIDER', message: string) => void;
 }
 
 interface SimulatedOffer {
@@ -154,6 +159,8 @@ export default function DriverPanel({
   isDriverOnline,
   setIsDriverOnline,
   onReplayTrip,
+  allTrips,
+  addAuditLog,
 }: DriverPanelProps) {
   const [isOnline, setIsOnline] = useState<boolean>(false);
   const [activeOffer, setActiveOffer] = useState<SimulatedOffer | null>(null);
@@ -479,6 +486,62 @@ export default function DriverPanel({
     }
   };
 
+  const handleClaimScheduledTrip = (scheduledTrip: Trip) => {
+    const claimedTrip: Trip = {
+      ...scheduledTrip,
+      status: 'ACCEPTED',
+      driver: {
+        name: profile.name,
+        rating: profile.rating || 5.0,
+        vehicleType: profile.vehicleType || 'X',
+        vehicleName: profile.vehicleName || 'ZamTaxi EV Sedan',
+        plateNumber: profile.plateNumber || 'ZMF-001',
+        avatar: profile.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+        phone: profile.phone || '+234 800 000 0000',
+        completedTrips: profile.completedTrips || 0
+      }
+    };
+
+    // 1. Update in Firestore
+    saveTripToFirestore(claimedTrip);
+
+    // 2. Pass to parent onAcceptTripByDriver
+    onAcceptTripByDriver({
+      id: claimedTrip.id,
+      passengerName: claimedTrip.passengerName || 'Ashiru Shehu',
+      passengerAvatar: claimedTrip.passengerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      passengerRating: claimedTrip.passengerRating || 4.9,
+      origin: claimedTrip.origin,
+      destination: claimedTrip.destination,
+      price: claimedTrip.price,
+      distance: claimedTrip.distanceMiles,
+      duration: claimedTrip.durationMinutes,
+    });
+
+    // 3. Set driver panel active trip
+    const mappedOffer: SimulatedOffer = {
+      id: claimedTrip.id,
+      passengerName: claimedTrip.passengerName || 'Ashiru Shehu',
+      passengerAvatar: claimedTrip.passengerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      passengerRating: claimedTrip.passengerRating || 4.9,
+      origin: claimedTrip.origin,
+      destination: claimedTrip.destination,
+      price: claimedTrip.price,
+      distance: claimedTrip.distanceMiles,
+      duration: claimedTrip.durationMinutes,
+      countdown: 0
+    };
+
+    setActiveTrip(mappedOffer);
+    setDriverState('PICKING_UP');
+    setDriveProgress(0);
+    setDriverPosition(city.landmarks[0] || null);
+
+    if (addAuditLog) {
+      addAuditLog('DRIVER', `Driver ${profile.name} claimed upcoming pickup #${claimedTrip.id} scheduled for ${claimedTrip.scheduledDate} @ ${claimedTrip.scheduledTime}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white text-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-[#E5DFD3] max-h-[85vh] lg:max-h-[90vh]">
       {/* HEADER */}
@@ -569,6 +632,106 @@ export default function DriverPanel({
               <Award size={14} className="text-emerald-700" />
               Manage EV Vehicle Financing & Document Uploads
             </button>
+          </div>
+        )}
+
+        {/* UPCOMING SCHEDULED RIDES (ADVANCE DRIVER CLAIMS ENGINE) */}
+        {driverState === 'IDLE' && (
+          <div className="bg-[#FAF7F2] p-4 rounded-2xl border border-[#E5DFD3] space-y-3 shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <CalendarClock size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider">
+                    Upcoming Pending Scheduled Pickups
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 font-medium">
+                    Advance claims engine — reserve upcoming rides for guaranteed payout
+                  </p>
+                </div>
+              </div>
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-300">
+                {(allTrips || []).filter((t) => t.status === 'Pending' || (t.status === 'SCHEDULED' && (!t.driver || t.driver.plateNumber === 'PENDING' || t.driver.name === 'Pending Assignment'))).length} Available
+              </span>
+            </div>
+
+            {((allTrips || []).filter((t) => t.status === 'Pending' || (t.status === 'SCHEDULED' && (!t.driver || t.driver.plateNumber === 'PENDING' || t.driver.name === 'Pending Assignment')))).length === 0 ? (
+              <div className="text-center py-5 space-y-1 bg-white p-4 rounded-xl border border-dashed border-[#E5DFD3]">
+                <Clock size={24} className="mx-auto text-zinc-400" />
+                <p className="text-xs font-extrabold text-zinc-700">No Pending Scheduled Pickups</p>
+                <p className="text-[10px] text-zinc-500">When riders pre-book rides in Gusau or inter-state, they will appear here for advance driver claims.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                {((allTrips || []).filter((t) => t.status === 'Pending' || (t.status === 'SCHEDULED' && (!t.driver || t.driver.plateNumber === 'PENDING' || t.driver.name === 'Pending Assignment')))).map((pendingTrip) => (
+                  <div
+                    key={pendingTrip.id}
+                    className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-2xs space-y-2.5 hover:border-emerald-400 transition"
+                  >
+                    {/* Header: Time & Price */}
+                    <div className="flex items-center justify-between border-b border-[#F2EDE4] pb-2">
+                      <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold">
+                        <CalendarClock size={13} className="text-emerald-700" />
+                        <span>{pendingTrip.scheduledDate || 'Tomorrow'} @ {pendingTrip.scheduledTime || '08:30'}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-zinc-500 uppercase font-bold block">Guaranteed Fare</span>
+                        <span className="text-xs font-black text-emerald-800">
+                          ₦{(pendingTrip.price || 3500).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Route Details */}
+                    <div className="space-y-1 text-xs font-medium bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DFD3]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                        <span className="font-bold text-zinc-900 truncate">{pendingTrip.origin.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
+                        <span className="font-bold text-zinc-900 truncate">{pendingTrip.destination.label}</span>
+                      </div>
+                    </div>
+
+                    {/* Rider info & Notes */}
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={pendingTrip.passengerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'}
+                          alt={pendingTrip.passengerName}
+                          className="w-6 h-6 rounded-full object-cover border border-zinc-300"
+                        />
+                        <span className="font-bold text-zinc-800">{pendingTrip.passengerName || 'Ashiru Shehu'}</span>
+                      </div>
+                      {pendingTrip.notes && (
+                        <span className="text-zinc-500 italic max-w-[150px] truncate">
+                          "{pendingTrip.notes}"
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleClaimScheduledTrip(pendingTrip)}
+                      disabled={!isOnline}
+                      className={`w-full py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-sm ${
+                        isOnline
+                          ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                          : 'bg-zinc-200 text-zinc-500 cursor-not-allowed'
+                      }`}
+                      id={`claim-trip-btn-${pendingTrip.id}`}
+                    >
+                      <CheckCircle2 size={14} />
+                      {isOnline ? 'Claim Pickup & Assign Driver' : 'Go Online to Claim Pickup'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
