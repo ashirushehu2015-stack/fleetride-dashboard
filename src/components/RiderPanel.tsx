@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import VoiceCallModal from './VoiceCallModal';
 import SafetyToolkitModal from './SafetyToolkitModal';
+import { QrPaymentModal } from './QrPaymentModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
 import { savePassengerToFirestore } from '../firebase';
@@ -55,7 +56,9 @@ import {
   CalendarClock,
   CalendarDays,
   Trash2,
-  Play
+  Play,
+  QrCode,
+  Scan
 } from 'lucide-react';
 
 interface RiderPanelProps {
@@ -237,7 +240,7 @@ export default function RiderPanel({
   }, [savedPaymentMethods]);
 
   // Deposit State
-  const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'card' | 'ussd' | 'voucher'>('bank_transfer');
+  const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'card' | 'qr_code' | 'ussd' | 'voucher'>('bank_transfer');
   const [depositAmount, setDepositAmount] = useState<string>('5000');
   const [copiedVirtualAcc, setCopiedVirtualAcc] = useState<boolean>(false);
   const [copiedUSSD, setCopiedUSSD] = useState<boolean>(false);
@@ -248,6 +251,10 @@ export default function RiderPanel({
   const [cardErrors, setCardErrors] = useState<CardValidationErrors>({});
   const [voucherCode, setVoucherCode] = useState<string>('');
   const [depositStatusMsg, setDepositStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // QR Code Payment Modal State
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [qrModalAmount, setQrModalAmount] = useState<number>(5000);
 
   // Link Payment Method Modal & Form State
   const [isLinkPaymentModalOpen, setIsLinkPaymentModalOpen] = useState<boolean>(false);
@@ -434,6 +441,53 @@ export default function RiderPanel({
     setDepositStatusMsg({
       type: 'success',
       text: `Successfully deposited ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} into your wallet! New balance: ₦${newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+    });
+  };
+
+  const handleQrPaymentSuccess = (amount: number, bankAppName: string, reference: string) => {
+    const currentBal = typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0;
+    const newBalance = parseFloat((currentBal + amount).toFixed(2));
+
+    if (setProfile) {
+      setProfile((prev) => ({
+        ...prev,
+        balance: newBalance
+      }));
+    }
+
+    if (setPassengers && profile) {
+      setPassengers((prevList) =>
+        prevList.map((p) => {
+          if (p.name === profile.name || p.id === profile.id) {
+            const updated = { ...p, balance: newBalance };
+            savePassengerToFirestore(updated);
+            return updated;
+          }
+          return p;
+        })
+      );
+    }
+
+    const newTx = {
+      id: 'tx-' + Math.random().toString(36).substr(2, 8),
+      type: 'deposit',
+      title: `NQR Code Payment via ${bankAppName}`,
+      amount: amount,
+      timestamp: 'Just now',
+      status: 'COMPLETED',
+      reference: reference || ('ZMF-NQR-' + Math.floor(100000 + Math.random() * 900000)),
+      method: `NQR Code (${bankAppName})`
+    };
+
+    setTransactions((prev) => [newTx, ...prev]);
+
+    if (addAuditLog && profile) {
+      addAuditLog('RIDER', `Passenger ${profile.name} scanned NQR payment code via ${bankAppName} for ₦${amount.toLocaleString()} routed to Zenith Bank (3098172654) Management Account.`);
+    }
+
+    setDepositStatusMsg({
+      type: 'success',
+      text: `✓ NQR Payment of ₦${amount.toLocaleString()} confirmed via ${bankAppName}! Funds routed to Central Management Account (Zenith Bank 3098172654) and credited to your wallet balance.`
     });
   };
 
@@ -1677,7 +1731,7 @@ export default function RiderPanel({
                 )}
 
                 {/* Deposit Method Selectors */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <button
                     type="button"
                     onClick={() => setDepositMethod('bank_transfer')}
@@ -1705,8 +1759,25 @@ export default function RiderPanel({
                   >
                     <CreditCard size={16} className={depositMethod === 'card' ? 'text-emerald-400' : 'text-zinc-600'} />
                     <div>
-                      <span className="block text-xs font-black">Debit/Credit Card</span>
+                      <span className="block text-xs font-black">Debit Card</span>
                       <span className="text-[9px] opacity-75 font-semibold">Instant Pay</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDepositMethod('qr_code')}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between h-18 ${
+                      depositMethod === 'qr_code'
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-md ring-1 ring-emerald-500'
+                        : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                    }`}
+                    id="deposit-method-qr-code"
+                  >
+                    <QrCode size={16} className={depositMethod === 'qr_code' ? 'text-emerald-400' : 'text-zinc-600'} />
+                    <div>
+                      <span className="block text-xs font-black">QR Code Scan</span>
+                      <span className="text-[9px] opacity-75 font-semibold">NQR Bank App</span>
                     </div>
                   </button>
 
@@ -1737,8 +1808,8 @@ export default function RiderPanel({
                   >
                     <Ticket size={16} className={depositMethod === 'voucher' ? 'text-emerald-400' : 'text-zinc-600'} />
                     <div>
-                      <span className="block text-xs font-black">Promo Voucher</span>
-                      <span className="text-[9px] opacity-75 font-semibold">Bonus Deposit</span>
+                      <span className="block text-xs font-black">Voucher</span>
+                      <span className="text-[9px] opacity-75 font-semibold">Bonus Code</span>
                     </div>
                   </button>
                 </div>
@@ -1909,6 +1980,110 @@ export default function RiderPanel({
                       Pay ₦{parseFloat(depositAmount || '0').toLocaleString()} via Debit Card
                     </button>
                   </form>
+                )}
+
+                {/* QR CODE SCAN DEPOSIT */}
+                {depositMethod === 'qr_code' && (
+                  <div className="space-y-4 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block">
+                        Quick Preset QR Amount
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {['2000', '5000', '10000', '20000', '50000'].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setDepositAmount(amt)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer border ${
+                              depositAmount === amt
+                                ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                                : 'bg-white text-zinc-800 border-[#E5DFD3] hover:bg-[#F2EDE4]'
+                            }`}
+                          >
+                            ₦{parseInt(amt).toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider block">
+                        Custom QR Deposit Amount (₦)
+                      </label>
+                      <input
+                        type="number"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        placeholder="e.g. 15000"
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-sm font-black text-zinc-900 outline-none focus:border-zinc-900"
+                        id="custom-qr-deposit-amount"
+                      />
+                    </div>
+
+                    {/* Dynamic QR Preview Card */}
+                    <div className="bg-zinc-950 text-white p-4 rounded-xl border-2 border-emerald-500/40 space-y-3">
+                      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                        <div className="flex items-center gap-2">
+                          <QrCode size={18} className="text-emerald-400" />
+                          <span className="text-xs font-black text-white">NQR Standard Merchant Payment</span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-950 text-emerald-400 font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/30">
+                          CBN NIBSS SWITCH
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 items-center">
+                        <div className="col-span-1 bg-white p-2 rounded-lg flex items-center justify-center shrink-0">
+                          <svg width="75" height="75" viewBox="0 0 100 100" fill="none">
+                            <rect width="100" height="100" fill="white"/>
+                            <rect x="5" y="5" width="30" height="30" fill="#09090b"/>
+                            <rect x="10" y="10" width="20" height="20" fill="white"/>
+                            <rect x="14" y="14" width="12" height="12" fill="#059669"/>
+
+                            <rect x="65" y="5" width="30" height="30" fill="#09090b"/>
+                            <rect x="70" y="10" width="20" height="20" fill="white"/>
+                            <rect x="74" y="14" width="12" height="12" fill="#059669"/>
+
+                            <rect x="5" y="65" width="30" height="30" fill="#09090b"/>
+                            <rect x="10" y="70" width="20" height="20" fill="white"/>
+                            <rect x="14" y="74" width="12" height="12" fill="#059669"/>
+
+                            <rect x="42" y="10" width="15" height="15" fill="#059669"/>
+                            <rect x="42" y="42" width="16" height="16" rx="3" fill="#047857"/>
+                            <rect x="10" y="42" width="25" height="12" fill="#09090b"/>
+                            <rect x="65" y="42" width="25" height="12" fill="#059669"/>
+                            <rect x="42" y="70" width="20" height="20" fill="#09090b"/>
+                            <rect x="70" y="70" width="15" height="15" fill="#059669"/>
+                          </svg>
+                        </div>
+                        <div className="col-span-2 space-y-1 text-xs">
+                          <span className="text-[10px] text-zinc-400 font-medium uppercase block">Payee Treasury Account</span>
+                          <p className="font-bold text-emerald-300">ZamTaxi Central Management Account</p>
+                          <p className="text-[11px] font-mono text-zinc-300">Zenith Bank / FirstBank: <strong className="text-white">3098172654</strong></p>
+                          <p className="text-[10px] text-zinc-400 font-mono">Encoded: <strong className="text-emerald-400 font-black">₦{parseFloat(depositAmount || '0').toLocaleString()}</strong></p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const amt = parseFloat(depositAmount);
+                        if (isNaN(amt) || amt <= 0) {
+                          setDepositStatusMsg({ type: 'error', text: 'Please enter a valid deposit amount greater than ₦0.' });
+                          return;
+                        }
+                        setQrModalAmount(amt);
+                        setIsQrModalOpen(true);
+                      }}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      id="launch-qr-payment-modal-btn"
+                    >
+                      <Scan size={18} />
+                      Generate & Scan QR Code via Bank App (₦{parseFloat(depositAmount || '0').toLocaleString()})
+                    </button>
+                  </div>
                 )}
 
                 {/* USSD DEPOSIT */}
@@ -3213,6 +3388,17 @@ export default function RiderPanel({
           </div>
         </div>
       )}
+
+      {/* QR Code Payment Modal */}
+      <QrPaymentModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        amount={qrModalAmount}
+        recipientName="ZamTaxi Central Management Treasury"
+        accountNumber="3098172654"
+        bankName="Zenith Bank / FirstBank"
+        onPaymentSuccess={handleQrPaymentSuccess}
+      />
     </div>
   );
 }
