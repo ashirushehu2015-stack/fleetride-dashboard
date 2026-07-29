@@ -62,6 +62,7 @@ export interface Trip {
   price: number;
   distanceMiles: number;
   durationMinutes: number;
+  predictedDurationMinutes?: number;
   driver: Driver;
   status: TripStatus;
   progress: number; // 0 to 1 representing the current leg

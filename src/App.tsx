@@ -427,6 +427,7 @@ export default function App() {
       price,
       distanceMiles: distance,
       durationMinutes: actualDuration,
+      predictedDurationMinutes: duration,
       driver: {
         name: 'Michael Scott',
         rating: 4.85,
