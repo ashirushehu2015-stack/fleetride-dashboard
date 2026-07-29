@@ -293,6 +293,21 @@ export default function App() {
     }
   }, [profile.role]);
 
+  // Keep active profile balance in sync with passengers state
+  useEffect(() => {
+    if (profile.role === 'rider') {
+      const activePass = passengers.find((p) => p.name === profile.name || p.email === profile.email || p.id === profile.id);
+      if (activePass && typeof activePass.balance === 'number' && !isNaN(activePass.balance)) {
+        if (activePass.balance !== profile.balance) {
+          setProfile((prev) => ({
+            ...prev,
+            balance: activePass.balance
+          }));
+        }
+      }
+    }
+  }, [passengers, profile.name, profile.role, profile.email, profile.id]);
+
   useEffect(() => {
     if (profile.role === 'rider' && activeTab !== 'rider' && activeTab !== 'settings') {
       setActiveTab('rider');

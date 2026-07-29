@@ -3,6 +3,7 @@ import VoiceCallModal from './VoiceCallModal';
 import SafetyToolkitModal from './SafetyToolkitModal';
 import { Location, VehicleConfig, Trip, ChatMessage, UserProfile, ScheduledRide } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVER_CHATBOT_PHRASES, CITIES } from '../data';
+import { savePassengerToFirestore } from '../firebase';
 import {
   MapPin,
   ChevronDown,
@@ -289,7 +290,7 @@ export default function RiderPanel({
       methodLabel = `Voucher (${code})`;
     }
 
-    const currentBal = profile?.balance ?? 50000;
+    const currentBal = typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0;
     const newBalance = parseFloat((currentBal + amt).toFixed(2));
 
     // Update profile balance
@@ -303,7 +304,14 @@ export default function RiderPanel({
     // Sync matching passenger in passengers array
     if (setPassengers && profile) {
       setPassengers((prevList) =>
-        prevList.map((p) => (p.name === profile.name ? { ...p, balance: newBalance } : p))
+        prevList.map((p) => {
+          if (p.name === profile.name || p.id === profile.id) {
+            const updated = { ...p, balance: newBalance };
+            savePassengerToFirestore(updated);
+            return updated;
+          }
+          return p;
+        })
       );
     }
 
@@ -336,7 +344,7 @@ export default function RiderPanel({
     e.preventDefault();
     setTransferStatusMsg(null);
     const amt = parseFloat(transferAmount);
-    const currentBal = profile?.balance ?? 50000;
+    const currentBal = typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0;
 
     if (isNaN(amt) || amt <= 0) {
       setTransferStatusMsg({ type: 'error', text: 'Please enter a valid transfer amount.' });
@@ -344,7 +352,7 @@ export default function RiderPanel({
     }
 
     if (amt > currentBal) {
-      setTransferStatusMsg({ type: 'error', text: `Insufficient wallet balance. You have ₦${currentBal.toLocaleString()}, but tried to send ₦${amt.toLocaleString()}.` });
+      setTransferStatusMsg({ type: 'error', text: `Insufficient wallet balance. You have ₦${currentBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}, but tried to transfer ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}.` });
       return;
     }
 
@@ -359,11 +367,15 @@ export default function RiderPanel({
       }));
     }
 
-    // Update passenger list
+    // Update passenger list and save to Firestore
     if (setPassengers && profile) {
       setPassengers((prevList) =>
         prevList.map((p) => {
-          if (p.name === profile.name) return { ...p, balance: newBalance };
+          if (p.name === profile.name || p.id === profile.id) {
+            const updated = { ...p, balance: newBalance };
+            savePassengerToFirestore(updated);
+            return updated;
+          }
           return p;
         })
       );
@@ -642,7 +654,7 @@ export default function RiderPanel({
               <Wallet size={14} />
               Wallet
               <span className="bg-emerald-100 text-emerald-950 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ml-0.5">
-                ₦{(profile?.balance ?? 50000).toLocaleString()}
+                ₦{(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </button>
           </div>
@@ -1163,10 +1175,10 @@ export default function RiderPanel({
                       <span>ZamTaxi Fare Wallet:</span>
                     </div>
                     <span className="font-black text-emerald-800 text-sm">
-                      ₦{(profile?.balance ?? 50000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₦{(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  {(profile?.balance ?? 50000) < getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1) ? (
+                  {(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0) < getPrice(VEHICLE_CONFIGS.find(v => v.id === selectedVehicle)?.multiplier || 1) ? (
                     <div className="flex items-center justify-between text-xs bg-amber-50 p-2 rounded-lg border border-amber-200 text-amber-900 font-bold">
                       <span>⚠️ Low wallet balance for this ride</span>
                       <button
@@ -1246,7 +1258,7 @@ export default function RiderPanel({
                 <span className="text-[10px] font-mono uppercase font-bold text-zinc-400 tracking-wider">Available Fare Balance</span>
                 <div className="text-3xl font-black text-white mt-0.5 flex items-baseline gap-1">
                   <span className="text-emerald-400 font-sans">₦</span>
-                  {(profile?.balance ?? 50000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {(typeof profile?.balance === 'number' && !isNaN(profile.balance) ? profile.balance : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
 
