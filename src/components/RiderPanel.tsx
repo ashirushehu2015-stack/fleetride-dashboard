@@ -187,7 +187,7 @@ export default function RiderPanel({
   const [depositStatusMsg, setDepositStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Transfer Fare State
-  const [transferRecipientPhone, setTransferRecipientPhone] = useState<string>('');
+  const [transferRecipientPhone, setTransferRecipientPhone] = useState<string>('ZamTaxi Central Management Treasury (+234 800 926 8294)');
   const [transferAmount, setTransferAmount] = useState<string>('2500');
   const [transferNote, setTransferNote] = useState<string>('');
   const [transferStatusMsg, setTransferStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -348,7 +348,7 @@ export default function RiderPanel({
       return;
     }
 
-    const recipientName = transferRecipientPhone || 'Bello Matawalle (+234 806 444 5566)';
+    const recipientName = transferRecipientPhone || 'ZamTaxi Central Management Treasury (+234 800 926 8294)';
     const newBalance = parseFloat((currentBal - amt).toFixed(2));
 
     // Update profile balance
@@ -364,9 +364,6 @@ export default function RiderPanel({
       setPassengers((prevList) =>
         prevList.map((p) => {
           if (p.name === profile.name) return { ...p, balance: newBalance };
-          if (transferRecipientPhone && (p.phone === transferRecipientPhone || p.id === transferRecipientPhone || p.email === transferRecipientPhone)) {
-            return { ...p, balance: parseFloat((p.balance + amt).toFixed(2)) };
-          }
           return p;
         })
       );
@@ -376,23 +373,23 @@ export default function RiderPanel({
     const newTx = {
       id: 'tx-' + Math.random().toString(36).substr(2, 8),
       type: 'transfer_out',
-      title: `Fare Transfer to ${recipientName}`,
+      title: `Management Transfer to ${recipientName}`,
       amount: -amt,
       timestamp: 'Just now',
       status: 'COMPLETED',
       reference: 'ZMF-TRF-' + Math.floor(100000 + Math.random() * 900000),
-      method: 'Wallet Transfer'
+      method: 'Corporate Account Transfer'
     };
 
     setTransactions((prev) => [newTx, ...prev]);
 
     if (addAuditLog && profile) {
-      addAuditLog('RIDER', `Passenger ${profile.name} transferred fare ₦${amt.toLocaleString()} to ${recipientName}. Note: ${transferNote || 'N/A'}`);
+      addAuditLog('RIDER', `Passenger ${profile.name} transferred ₦${amt.toLocaleString()} to ${recipientName}. Note: ${transferNote || 'N/A'}`);
     }
 
     setTransferStatusMsg({
       type: 'success',
-      text: `Transfer successful! ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} sent to ${recipientName}.`
+      text: `Transfer successful! ₦${amt.toLocaleString(undefined, { minimumFractionDigits: 2 })} transferred to ${recipientName}.`
     });
     setTransferNote('');
   };
@@ -1598,9 +1595,9 @@ export default function RiderPanel({
                 <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
                   <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider flex items-center gap-2">
                     <ArrowLeftRight size={15} className="text-emerald-700" />
-                    Transfer Fare to Passenger or Driver
+                    Transfer Funds to Management / Company Account
                   </h4>
-                  <span className="text-[10px] font-bold text-zinc-600">Zero Commission Fee</span>
+                  <span className="text-[10px] font-bold text-zinc-600">Official Treasury Only</span>
                 </div>
 
                 {transferStatusMsg && (
@@ -1622,7 +1619,7 @@ export default function RiderPanel({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase text-zinc-600 tracking-wider">
-                    Select Recipient
+                    Select Recipient Management / Company Account
                   </label>
                   <select
                     value={transferRecipientPhone}
@@ -1630,15 +1627,19 @@ export default function RiderPanel({
                     className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-zinc-900 outline-none cursor-pointer"
                     id="transfer-recipient-select"
                   >
-                    <option value="">Bello Matawalle (+234 806 444 5566)</option>
-                    <option value="diana@transit.ng">Diana Prince (+234 813 999 8888)</option>
-                    <option value="driver-1">Michael Scott (ZamTaxi EV Driver)</option>
-                    {passengers && passengers.filter(p => p.name !== profile?.name).map(p => (
-                      <option key={p.id} value={p.phone || p.id}>
-                        {p.name} ({p.phone || p.email})
-                      </option>
-                    ))}
+                    <option value="ZamTaxi Central Management Treasury (+234 800 926 8294)">
+                      ZamTaxi Central Management Treasury (+234 800 926 8294)
+                    </option>
+                    <option value="ZamTaxi Revenue & Operations Account (Zenith Bank - 0092817364)">
+                      ZamTaxi Revenue & Operations Account (Zenith Bank - 0092817364)
+                    </option>
+                    <option value="Zamfara State Transport Fleet Settlement (FirstBank - 1019283746)">
+                      Zamfara State Transport Fleet Settlement (FirstBank - 1019283746)
+                    </option>
                   </select>
+                  <p className="text-[10px] text-zinc-500 font-medium pt-1">
+                    🔒 Passenger wallet transfers are restricted exclusively to official Management and Company accounts. Transfers to driver personal accounts are disabled.
+                  </p>
                 </div>
 
                 <div className="space-y-1">
@@ -1663,7 +1664,7 @@ export default function RiderPanel({
                     type="text"
                     value={transferNote}
                     onChange={(e) => setTransferNote(e.target.value)}
-                    placeholder="e.g. Fare contribution for Abuja interstate trip"
+                    placeholder="e.g. Account settlement / Corporate booking payment"
                     className="w-full bg-white border border-[#E5DFD3] rounded-xl px-3.5 py-2 text-xs font-medium text-zinc-900 outline-none"
                     id="transfer-note-input"
                   />
