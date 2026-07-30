@@ -1237,15 +1237,19 @@ export function DashboardDisplayScreen({
                   .reverse()
                   .map((trip) => {
                     const formattedDate = trip.timestamp
-                      ? trip.timestamp.includes('T')
-                        ? new Date(trip.timestamp).toLocaleDateString() +
-                          ' ' +
+                      ? (trip.timestamp.includes('T')
+                        ? new Date(trip.timestamp).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          }) +
+                          ' at ' +
                           new Date(trip.timestamp).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit'
                           })
-                        : trip.timestamp
-                      : new Date().toLocaleTimeString();
+                        : trip.timestamp)
+                      : new Date().toLocaleDateString();
                     return (
                       <div
                         key={trip.id}

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Passenger, AdminUser, SystemAuditLog } from './UserManagementPanel';
 import { UserProfile, Trip } from '../types';
+import { filterTripsForPassenger, filterTripsForDriver, generatePassengerHistoricalTrips } from '../utils/tripHelpers';
 
 interface UserManagementDisplayScreenProps {
   activeProfile: UserProfile;
@@ -286,14 +287,40 @@ export default function UserManagementDisplayScreen({
                   </div>
                 </div>
 
-                {/* BALANCE DISPLAY */}
-                <div className="text-right sm:text-right bg-white p-3 rounded-xl border border-[#E5DFD3] w-full sm:w-auto shadow-2xs">
-                  <span className="text-[9px] font-extrabold uppercase text-zinc-500 tracking-wider block">Wallet Balance</span>
-                  <div className="text-xl font-black text-emerald-700 font-mono mt-0.5">
-                    ₦{selectedPassenger.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] text-zinc-600 font-bold block mt-0.5">{selectedPassenger.completedTrips} Total Rides Taken</span>
-                </div>
+                {/* FINANCIAL & RIDE METRICS GRID */}
+                {(() => {
+                  let passengerTrips = filterTripsForPassenger(selectedPassenger, completedTrips);
+                  if (passengerTrips.length === 0 && selectedPassenger.completedTrips > 0) {
+                    passengerTrips = generatePassengerHistoricalTrips(selectedPassenger);
+                  }
+                  const totalSpending = passengerTrips.reduce((sum, t) => sum + (t.price || 0), 0);
+                  const totalRidesCount = passengerTrips.length > 0 ? passengerTrips.length : selectedPassenger.completedTrips;
+
+                  return (
+                    <div className="flex flex-wrap items-center gap-3 bg-white p-3.5 rounded-xl border border-[#E5DFD3] w-full sm:w-auto shadow-2xs">
+                      <div className="text-left pr-3 border-r border-[#E5DFD3]">
+                        <span className="text-[9px] font-extrabold uppercase text-zinc-500 tracking-wider block">Wallet Balance</span>
+                        <div className="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                          ₦{selectedPassenger.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+
+                      <div className="text-left pr-3 border-r border-[#E5DFD3]">
+                        <span className="text-[9px] font-extrabold uppercase text-zinc-500 tracking-wider block">Total Rides</span>
+                        <div className="text-lg font-black text-zinc-900 font-mono mt-0.5">
+                          {totalRidesCount} Rides
+                        </div>
+                      </div>
+
+                      <div className="text-left">
+                        <span className="text-[9px] font-extrabold uppercase text-indigo-700 tracking-wider block">Total Spendings</span>
+                        <div className="text-lg font-black text-indigo-900 font-mono mt-0.5">
+                          ₦{totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* ACTION BUTTONS RAIL */}
@@ -378,27 +405,58 @@ export default function UserManagementDisplayScreen({
             <div className="space-y-3">
               <h4 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider flex items-center gap-2 border-b border-[#E5DFD3] pb-2">
                 <Clock size={15} className="text-emerald-700" />
-                Ride History for {selectedPassenger.name}
+                Ride History Log for {selectedPassenger.name}
               </h4>
 
-              {completedTrips.length === 0 ? (
-                <p className="text-xs text-zinc-500 italic p-4 bg-[#FAF7F2] rounded-xl border border-[#E5DFD3]">No completed trip logs recorded for this passenger yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {completedTrips.map((trip) => (
-                    <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-extrabold text-zinc-900">{trip.origin.label} → {trip.destination.label}</span>
-                        <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{trip.driver.name} ({trip.vehicleType}) • {trip.distanceMiles}km</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                        <div className="text-[9px] text-zinc-500">{trip.durationMinutes} mins</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                let passengerTrips = filterTripsForPassenger(selectedPassenger, completedTrips);
+                if (passengerTrips.length === 0 && selectedPassenger.completedTrips > 0) {
+                  passengerTrips = generatePassengerHistoricalTrips(selectedPassenger);
+                }
+
+                if (passengerTrips.length === 0) {
+                  return (
+                    <p className="text-xs text-zinc-500 italic p-4 bg-[#FAF7F2] rounded-xl border border-[#E5DFD3]">
+                      No completed trip logs recorded for this passenger yet.
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {passengerTrips.map((trip) => {
+                      const formattedDate = trip.timestamp
+                        ? (trip.timestamp.includes('T')
+                          ? new Date(trip.timestamp).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            }) + ' at ' + new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : trip.timestamp)
+                        : new Date().toLocaleDateString();
+
+                      return (
+                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs">
+                          <div>
+                            <span className="font-extrabold text-zinc-900">{trip.origin.label} → {trip.destination.label}</span>
+                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5">
+                              Driver: <span className="font-bold text-zinc-800">{trip.driver.name}</span> ({trip.vehicleType}) • {trip.distanceMiles}km
+                            </div>
+                            <div className="text-[10px] text-emerald-800 font-mono mt-1 font-semibold flex items-center gap-1.5">
+                              <Calendar size={12} className="text-emerald-700 shrink-0" />
+                              <span>{formattedDate}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -486,6 +544,60 @@ export default function UserManagementDisplayScreen({
                 </button>
               </div>
             </div>
+
+            {/* RECENT TRIPS HISTORY FOR THIS DRIVER */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider flex items-center gap-2 border-b border-[#E5DFD3] pb-2">
+                <Clock size={15} className="text-sky-700" />
+                Ride History Log for Driver {selectedDriver.name}
+              </h4>
+
+              {(() => {
+                const driverTrips = completedTrips.filter((t) => t.driver?.name === selectedDriver.name);
+                if (driverTrips.length === 0) {
+                  return (
+                    <p className="text-xs text-zinc-500 italic p-4 bg-[#FAF7F2] rounded-xl border border-[#E5DFD3]">
+                      No completed trip logs recorded for this driver yet.
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {driverTrips.map((trip) => {
+                      const formattedDate = trip.timestamp
+                        ? (trip.timestamp.includes('T')
+                          ? new Date(trip.timestamp).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            }) + ' at ' + new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : trip.timestamp)
+                        : new Date().toLocaleDateString();
+
+                      return (
+                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs">
+                          <div>
+                            <span className="font-extrabold text-zinc-900">{trip.origin.label} → {trip.destination.label}</span>
+                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5">
+                              Passenger: <span className="font-bold text-zinc-800">{trip.passengerName}</span> • {trip.vehicleType} • {trip.distanceMiles}km
+                            </div>
+                            <div className="text-[10px] text-sky-800 font-mono mt-1 font-semibold flex items-center gap-1.5">
+                              <Calendar size={12} className="text-sky-700 shrink-0" />
+                              <span>{formattedDate}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -565,27 +677,41 @@ export default function UserManagementDisplayScreen({
                   </h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {passengers.map((pass) => (
-                      <div
-                        key={pass.id}
-                        onClick={() => setSelectedUser({ id: pass.id, type: 'passenger' })}
-                        className="p-4 bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl space-y-3 cursor-pointer hover:border-zinc-400 hover:bg-[#F2EDE4] transition shadow-2xs group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <img src={pass.avatar} alt={pass.name} className="w-10 h-10 rounded-full object-cover border border-[#E5DFD3]" />
-                            <div>
-                              <h4 className="text-xs font-black text-zinc-900 group-hover:text-emerald-800 transition">{pass.name}</h4>
-                              <p className="text-[10px] text-zinc-500 font-mono">{pass.email}</p>
+                    {passengers.map((pass) => {
+                      let passengerTrips = filterTripsForPassenger(pass, completedTrips);
+                      if (passengerTrips.length === 0 && pass.completedTrips > 0) {
+                        passengerTrips = generatePassengerHistoricalTrips(pass);
+                      }
+                      const totalSpending = passengerTrips.reduce((sum, t) => sum + (t.price || 0), 0);
+                      const totalRidesCount = passengerTrips.length > 0 ? passengerTrips.length : pass.completedTrips;
+
+                      return (
+                        <div
+                          key={pass.id}
+                          onClick={() => setSelectedUser({ id: pass.id, type: 'passenger' })}
+                          className="p-4 bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl space-y-3 cursor-pointer hover:border-zinc-400 hover:bg-[#F2EDE4] transition shadow-2xs group text-left"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img src={pass.avatar} alt={pass.name} className="w-10 h-10 rounded-full object-cover border border-[#E5DFD3] shrink-0" />
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-black text-zinc-900 group-hover:text-emerald-800 transition truncate">{pass.name}</h4>
+                                <p className="text-[10px] text-zinc-500 font-mono truncate">{pass.email}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-black text-emerald-700 font-mono block">₦{pass.balance.toLocaleString()}</span>
+                              <span className="text-[9px] text-zinc-500 font-bold block">{totalRidesCount} Rides</span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-xs font-black text-emerald-700 font-mono block">₦{pass.balance.toLocaleString()}</span>
-                            <span className="text-[9px] text-zinc-500 font-bold">{pass.completedTrips} Trips</span>
+
+                          <div className="pt-2 border-t border-[#E5DFD3] flex items-center justify-between text-[10px] font-mono">
+                            <span className="text-zinc-500 font-sans font-bold">Total Spent:</span>
+                            <span className="font-black text-indigo-800">₦{totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -23,6 +23,7 @@ import {
   saveTripToFirestore, 
   seedInitialFirestoreData 
 } from './firebase';
+import { filterTripsForPassenger, generatePassengerHistoricalTrips } from './utils/tripHelpers';
 
 export default function App() {
   // 1. Core State Managers
@@ -322,6 +323,27 @@ export default function App() {
     return (saved as 'landing' | 'app') || 'landing';
   });
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
+
+  // Ensure every passenger with completedTrips > 0 has matching historical trip records
+  useEffect(() => {
+    if (passengers.length === 0) return;
+
+    let newTripsToAdd: Trip[] = [];
+    passengers.forEach((p) => {
+      if (p.completedTrips && p.completedTrips > 0) {
+        const existingForP = filterTripsForPassenger(p, completedTrips);
+        if (existingForP.length === 0) {
+          const generated = generatePassengerHistoricalTrips(p);
+          newTripsToAdd.push(...generated);
+        }
+      }
+    });
+
+    if (newTripsToAdd.length > 0) {
+      setCompletedTrips((prev) => [...prev, ...newTripsToAdd]);
+      newTripsToAdd.forEach((t) => saveTripToFirestore(t));
+    }
+  }, [passengers, completedTrips.length]);
   const [isSurgeActive, setIsSurgeActive] = useState<boolean>(false);
   const [isPeakTraffic, setIsPeakTraffic] = useState<boolean>(() => {
     return localStorage.getItem('zamfara_peak_traffic') === 'true';

@@ -25,6 +25,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { VehicleType, UserProfile, Trip } from '../types';
+import { filterTripsForPassenger, filterTripsForDriver, generatePassengerHistoricalTrips } from '../utils/tripHelpers';
 
 export interface Passenger {
   id: string;
@@ -555,15 +556,28 @@ export default function UserManagementPanel({
                       </div>
 
                       {/* RIGHT COLS: BALANCE & STATE ACTION */}
-                      <div className="text-right shrink-0">
-                        <div className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Passenger Wallet</div>
-                        <div className="text-xs font-black text-emerald-500 mt-0.5">
-                          ₦{pass.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                        <div className="text-[9px] text-zinc-400 mt-0.5 font-medium">
-                          {pass.completedTrips} Trips taken
-                        </div>
-                      </div>
+                      {(() => {
+                        let passengerTrips = filterTripsForPassenger(pass, completedTrips);
+                        if (passengerTrips.length === 0 && pass.completedTrips > 0) {
+                          passengerTrips = generatePassengerHistoricalTrips(pass);
+                        }
+                        const totalSpending = passengerTrips.reduce((sum, t) => sum + (t.price || 0), 0);
+                        const totalRidesCount = passengerTrips.length > 0 ? passengerTrips.length : pass.completedTrips;
+
+                        return (
+                          <div className="text-right shrink-0">
+                            <div className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider">Passenger Wallet</div>
+                            <div className="text-xs font-black text-emerald-500 mt-0.5">
+                              ₦{pass.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-[9px] text-zinc-400 mt-0.5 font-medium flex items-center justify-end gap-1">
+                              <span>{totalRidesCount} Rides</span>
+                              <span>•</span>
+                              <span className="text-indigo-400 font-mono font-bold">₦{totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2 })} Spent</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* INTERACTIVE CONTROLS RAIL */}
@@ -1034,9 +1048,13 @@ export default function UserManagementPanel({
                 {completedTrips.slice().reverse().map((trip) => {
                   const formattedDate = trip.timestamp 
                     ? (trip.timestamp.includes('T') 
-                      ? new Date(trip.timestamp).toLocaleDateString() + ' ' + new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      ? new Date(trip.timestamp).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        }) + ' at ' + new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       : trip.timestamp)
-                    : new Date().toLocaleTimeString();
+                    : new Date().toLocaleDateString();
                     
                   return (
                     <div key={trip.id} className="bg-zinc-900/40 border border-zinc-900 rounded-xl p-3.5 flex flex-col sm:flex-row justify-between gap-3 text-xs shadow-sm hover:border-zinc-800 transition">
