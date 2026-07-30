@@ -43,7 +43,14 @@ import {
   DollarSign,
   Zap,
   CalendarClock,
-  CheckCircle2
+  CheckCircle2,
+  Radio,
+  Smartphone,
+  Satellite,
+  Info,
+  Gauge,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface DriverPanelProps {
@@ -175,9 +182,103 @@ export default function DriverPanel({
   const [driverChatInput, setDriverChatInput] = useState<string>('');
   const [weeklyEarnings, setWeeklyEarnings] = useState(getInitialWeeklyEarnings);
   const [chartType, setChartType] = useState<'bar' | 'area'>('bar');
+
+  // Option A: Smartphone Live GPS Telematics State
+  const [useLiveDeviceGps, setUseLiveDeviceGps] = useState<boolean>(true);
+  const [isOptionAGuideOpen, setIsOptionAGuideOpen] = useState<boolean>(false);
+  const [gpsTelemetry, setGpsTelemetry] = useState<{
+    lat: number | null;
+    lng: number | null;
+    accuracy: number | null;
+    speed: number | null;
+    heading: number | null;
+    status: 'IDLE' | 'SEARCHING' | 'LOCK' | 'ERROR';
+    errorMsg: string | null;
+    lastUpdated: string | null;
+  }>({
+    lat: null,
+    lng: null,
+    accuracy: null,
+    speed: null,
+    heading: null,
+    status: 'IDLE',
+    errorMsg: null,
+    lastUpdated: null
+  });
+
   const [driverMessages, setDriverMessages] = useState<Array<{ id: string; sender: 'driver' | 'rider'; text: string; time: string; status?: 'sent' | 'delivered' | 'read' }>>([
     { id: '1', sender: 'rider', text: "Hello driver, I'm waiting at the pickup spot!", time: 'Just now', status: 'read' }
   ]);
+
+  // Option A: Live Geolocation Watcher (Smartphone GPS Telematics)
+  useEffect(() => {
+    if (!isOnline || !useLiveDeviceGps) {
+      setGpsTelemetry((prev) => ({ ...prev, status: 'IDLE', errorMsg: null }));
+      return;
+    }
+
+    if (!('geolocation' in navigator)) {
+      setGpsTelemetry({
+        lat: null,
+        lng: null,
+        accuracy: null,
+        speed: null,
+        heading: null,
+        status: 'ERROR',
+        errorMsg: 'Geolocation API is not supported by this browser/device.',
+        lastUpdated: null
+      });
+      return;
+    }
+
+    setGpsTelemetry((prev) => ({ ...prev, status: 'SEARCHING', errorMsg: null }));
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy, speed, heading } = pos.coords;
+        const formattedTime = new Date().toLocaleTimeString();
+
+        setGpsTelemetry({
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy ? Math.round(accuracy) : 5,
+          speed: speed ? Math.round(speed * 3.6) : 0,
+          heading: heading ? Math.round(heading) : 0,
+          status: 'LOCK',
+          errorMsg: null,
+          lastUpdated: formattedTime
+        });
+
+        // Broadcast current live smartphone coordinates to platform driver position
+        setDriverPosition({ lat: latitude, lng: longitude });
+
+        if (addAuditLog && Math.random() < 0.05) {
+          addAuditLog('DRIVER', `Option A Live GPS Telemetry: ${latitude.toFixed(4)}°, ${longitude.toFixed(4)}° (±${Math.round(accuracy)}m accuracy)`);
+        }
+      },
+      (err) => {
+        setGpsTelemetry({
+          lat: null,
+          lng: null,
+          accuracy: null,
+          speed: null,
+          heading: null,
+          status: 'ERROR',
+          errorMsg: err.message || 'Location access denied or unavailable.',
+          lastUpdated: new Date().toLocaleTimeString()
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 3000
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [isOnline, useLiveDeviceGps, setDriverPosition, addAuditLog]);
 
   const sendDriverMessage = (text: string) => {
     if (!text.trim()) return;
@@ -563,6 +664,116 @@ export default function DriverPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+        {/* OPTION A: SMARTPHONE GPS TELEMATICS CONTROL & LIVE FEED */}
+        <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl p-3.5 space-y-3 text-left shadow-2xs">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl shrink-0">
+                <Smartphone size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="font-extrabold text-xs text-zinc-900">Option A: Smartphone GPS Telematics</h4>
+                  <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded border border-emerald-300 uppercase tracking-wider">
+                    Software Tracking
+                  </span>
+                </div>
+                <p className="text-[10px] text-zinc-600 font-medium">
+                  Tracks vehicle position live via driver smartphone (Zero extra hardware cost)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsOptionAGuideOpen(true)}
+                className="px-2.5 py-1 bg-white hover:bg-zinc-100 border border-[#E5DFD3] text-zinc-800 rounded-lg text-[11px] font-extrabold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              >
+                <Info size={13} className="text-emerald-700" />
+                <span>How Option A Works</span>
+              </button>
+
+              <label className="flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-[#E5DFD3] shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={useLiveDeviceGps}
+                  onChange={(e) => setUseLiveDeviceGps(e.target.checked)}
+                  className="rounded text-emerald-700 focus:ring-emerald-600 h-3.5 w-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] font-extrabold text-zinc-800">Live Phone GPS</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Telemetry Stats Grid */}
+          {isOnline && useLiveDeviceGps && (
+            <div className="bg-white p-3 rounded-xl border border-[#E5DFD3] grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs shadow-2xs">
+              <div className="p-2 bg-[#FAF7F2] rounded-lg border border-[#E5DFD3]/60">
+                <div className="text-[9px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+                  <Satellite size={11} className={gpsTelemetry.status === 'LOCK' ? 'text-emerald-600 animate-pulse' : 'text-amber-500'} />
+                  Signal Status
+                </div>
+                <div className="font-black text-zinc-900 font-mono text-[11px] mt-0.5 truncate">
+                  {gpsTelemetry.status === 'LOCK' ? (
+                    <span className="text-emerald-700 font-extrabold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping inline-block" />
+                      3D GPS Lock
+                    </span>
+                  ) : gpsTelemetry.status === 'SEARCHING' ? (
+                    <span className="text-amber-600 font-bold">Acquiring...</span>
+                  ) : gpsTelemetry.status === 'ERROR' ? (
+                    <span className="text-rose-600 font-bold">Error</span>
+                  ) : (
+                    <span className="text-zinc-500">Standby</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-2 bg-[#FAF7F2] rounded-lg border border-[#E5DFD3]/60">
+                <div className="text-[9px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+                  <MapPin size={11} className="text-sky-600" />
+                  Live Coordinates
+                </div>
+                <div className="font-mono text-[10px] font-bold text-zinc-900 mt-0.5 truncate">
+                  {gpsTelemetry.lat && gpsTelemetry.lng ? (
+                    `${gpsTelemetry.lat.toFixed(4)}°, ${gpsTelemetry.lng.toFixed(4)}°`
+                  ) : (
+                    <span className="text-zinc-400">Gusau Center</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-2 bg-[#FAF7F2] rounded-lg border border-[#E5DFD3]/60">
+                <div className="text-[9px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+                  <Gauge size={11} className="text-purple-600" />
+                  Speed & Bearing
+                </div>
+                <div className="font-mono text-[11px] font-bold text-zinc-900 mt-0.5">
+                  {gpsTelemetry.speed ?? 0} km/h • {gpsTelemetry.heading ?? 0}°
+                </div>
+              </div>
+
+              <div className="p-2 bg-[#FAF7F2] rounded-lg border border-[#E5DFD3]/60">
+                <div className="text-[9px] font-bold uppercase text-zinc-500 flex items-center gap-1">
+                  <Radio size={11} className="text-emerald-600" />
+                  Accuracy
+                </div>
+                <div className="font-mono text-[11px] font-bold text-emerald-800 mt-0.5">
+                  {gpsTelemetry.accuracy ? `±${gpsTelemetry.accuracy} meters` : 'High Precision'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {gpsTelemetry.errorMsg && useLiveDeviceGps && isOnline && (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] flex items-center gap-2">
+              <AlertCircle size={14} className="text-amber-700 shrink-0" />
+              <span>{gpsTelemetry.errorMsg} (Falling back to simulated location)</span>
+            </div>
+          )}
+        </div>
+
         {/* ONLINE/OFFLINE RADAR ACTUATOR */}
         {driverState === 'IDLE' && (
           <div className="flex flex-col items-center justify-center py-4">
@@ -1352,6 +1563,93 @@ export default function DriverPanel({
           setIsOnboardingModalOpen(false);
         }}
       />
+
+      {/* Option A: Smartphone Telematics Guide Modal */}
+      {isOptionAGuideOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-[#E5DFD3] text-left max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-zinc-900">Option A: Smartphone GPS Telematics</h3>
+                  <p className="text-xs text-zinc-500 font-medium">How to track vehicles without hardware installation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOptionAGuideOpen(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-700 rounded-lg hover:bg-zinc-100 transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-zinc-700 leading-relaxed">
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-1">
+                <div className="font-extrabold text-emerald-900 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-700" />
+                  No Hardwired Trackers or Car Alterations Required
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  With Option A, each car is tracked directly through the driver's smartphone running the official <strong>ZamTaxi Driver App</strong>. The phone's internal high-precision GPS sensor acts as the vehicle telematics unit.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-zinc-900 uppercase tracking-wider text-[11px]">
+                  Required Equipment for Vehicle Drivers:
+                </h4>
+                <ul className="space-y-1.5 list-disc list-inside text-[#3A352E]">
+                  <li><strong>Android or iOS Smartphone</strong> with GPS/Location services enabled.</li>
+                  <li><strong>Dashboard Phone Mount / Cradle</strong> fixed firmly on the vehicle dashboard.</li>
+                  <li><strong>12V Car Charger / USB Cable</strong> kept plugged in so the battery stays at 100%.</li>
+                  <li><strong>SIM Card with Active Data Plan</strong> (MTN, Airtel, Glo, or 9mobile 4G/5G).</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-zinc-900 uppercase tracking-wider text-[11px]">
+                  How Location Telemetry Streams to the Platform:
+                </h4>
+                <ol className="space-y-2 list-decimal list-inside text-[#3A352E]">
+                  <li className="pl-1">
+                    <strong>Go Online in Driver Console:</strong> The driver toggles "Online" when starting their shift.
+                  </li>
+                  <li className="pl-1">
+                    <strong>Live Coordinate Streaming:</strong> The device sends latitude, longitude, speed, and heading to the platform every 2 seconds via WebSockets/Firestore.
+                  </li>
+                  <li className="pl-1">
+                    <strong>Admin Dispatch Map Visibility:</strong> Fleet managers view all active vehicles moving live on the Gusau/Zamfara GIS map in real time.
+                  </li>
+                  <li className="pl-1">
+                    <strong>Rider Live Tracking:</strong> Passengers see their assigned driver approaching their pickup point and along the ride.
+                  </li>
+                </ol>
+              </div>
+
+              <div className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-[11px]">
+                <span className="font-bold text-zinc-800">Active Telemetry Status:</span>
+                <span className="font-mono font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                  {useLiveDeviceGps ? 'ENABLED (Phone Sensor Active)' : 'SIMULATION MODE'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsOptionAGuideOpen(false)}
+                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs rounded-xl cursor-pointer transition shadow-xs"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
