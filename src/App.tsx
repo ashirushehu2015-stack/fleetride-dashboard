@@ -10,8 +10,9 @@ import UserManagementPanel from './components/UserManagementPanel';
 import UserManagementDisplayScreen from './components/UserManagementDisplayScreen';
 import LandingPage from './components/LandingPage';
 import StakeholderPresentationModal from './components/StakeholderPresentationModal';
+import AppDeploymentModal from './components/AppDeploymentModal';
 import ZamTaxiLogo from './components/ZamTaxiLogo';
-import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert, Presentation } from 'lucide-react';
+import { Car, User, ShieldCheck, MapPin, Settings, HelpCircle, Navigation, Info, LayoutDashboard, LogIn, ShieldAlert, Presentation, Smartphone } from 'lucide-react';
 // @ts-ignore
 import zamfaraLogo from './assets/images/zamfara_state_logo_official.png';
 import { 
@@ -37,6 +38,7 @@ export default function App() {
   const [userSubTab, setUserSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
   const [selectedUser, setSelectedUser] = useState<{ id: string; type: 'passenger' | 'driver' | 'admin' } | null>(null);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+  const [isAppDeploymentOpen, setIsAppDeploymentOpen] = useState(false);
 
   // Initial Passengers fallback
   const INITIAL_PASSENGERS = [
@@ -1069,6 +1071,16 @@ export default function App() {
           </div>
 
           <button
+            onClick={() => setIsAppDeploymentOpen(true)}
+            className="px-3 py-2 rounded-xl border border-emerald-400 bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-sm"
+            title="Mobile & Windows App Deployment"
+            id="btn-open-deployment-modal"
+          >
+            <Smartphone size={15} />
+            <span className="hidden sm:inline">App Download / Deploy</span>
+          </button>
+
+          <button
             onClick={() => setIsPresentationOpen(true)}
             className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-2xs"
             title="System Presentation for Stakeholders"
@@ -1340,6 +1352,11 @@ export default function App() {
       <StakeholderPresentationModal
         isOpen={isPresentationOpen}
         onClose={() => setIsPresentationOpen(false)}
+      />
+
+      <AppDeploymentModal
+        isOpen={isAppDeploymentOpen}
+        onClose={() => setIsAppDeploymentOpen(false)}
       />
     </div>
   );

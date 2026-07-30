@@ -1,0 +1,39 @@
+{
+  "short_name": "ZamTaxi",
+  "name": "ZamTaxi - Green Mobility & Ride Share",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#09090b",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Official Green Electric Mobility & Ride-Hailing Platform across Nigeria.",
+  "categories": ["travel", "transportation", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Book a Ride",
+      "short_name": "Book Ride",
+      "url": "/?mode=rider",
+      "description": "Quickly request an electric taxi ride"
+    },
+    {
+      "name": "Driver Mode",
+      "short_name": "Driver",
+      "url": "/?mode=driver",
+      "description": "Accept passenger requests and start driving"
+    }
+  ]
+}
