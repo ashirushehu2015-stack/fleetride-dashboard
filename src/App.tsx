@@ -1070,25 +1070,29 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            onClick={() => setIsAppDeploymentOpen(true)}
-            className="px-3 py-2 rounded-xl border border-emerald-400 bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-sm"
-            title="Mobile & Windows App Deployment"
-            id="btn-open-deployment-modal"
-          >
-            <Smartphone size={15} />
-            <span className="hidden sm:inline">App Download / Deploy</span>
-          </button>
+          {profile.role === 'admin' && (
+            <button
+              onClick={() => setIsAppDeploymentOpen(true)}
+              className="px-3 py-2 rounded-xl border border-emerald-400 bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-sm"
+              title="Mobile & Windows App Deployment"
+              id="btn-open-deployment-modal"
+            >
+              <Smartphone size={15} />
+              <span className="hidden sm:inline">App Download / Deploy</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsPresentationOpen(true)}
-            className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-2xs"
-            title="System Presentation for Stakeholders"
-            id="btn-open-presentation-modal"
-          >
-            <Presentation size={15} className="text-emerald-700" />
-            <span className="hidden md:inline">Presentation Deck</span>
-          </button>
+          {profile.role === 'admin' && (
+            <button
+              onClick={() => setIsPresentationOpen(true)}
+              className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition cursor-pointer flex items-center gap-1.5 font-bold text-xs shadow-2xs"
+              title="System Presentation for Stakeholders"
+              id="btn-open-presentation-modal"
+            >
+              <Presentation size={15} className="text-emerald-700" />
+              <span className="hidden md:inline">Presentation Deck</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('settings')}

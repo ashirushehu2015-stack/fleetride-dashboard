@@ -519,14 +519,6 @@ export default function LandingPage({
               <ShieldCheck size={13} className="text-amber-400" />
               Admin Portal
             </button>
-            <button 
-              onClick={() => setIsDeploymentOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3 py-2 rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer border border-emerald-400"
-              id="landing-download-app-btn"
-            >
-              <Smartphone size={13} />
-              App Download
-            </button>
           </div>
         </div>
       </nav>
