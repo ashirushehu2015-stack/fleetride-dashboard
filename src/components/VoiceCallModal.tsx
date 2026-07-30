@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PhoneOff, Mic, MicOff, Volume2, VolumeX, MessageSquare, Play, Square, ShieldCheck, Sparkles, Check } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Volume2, VolumeX, MessageSquare, Play, Square, ShieldCheck, Sparkles, Radio, Activity } from 'lucide-react';
 
 interface VoiceCallModalProps {
   isOpen: boolean;
@@ -10,6 +10,21 @@ interface VoiceCallModalProps {
   vehicleInfo?: string;
   phoneNumber?: string;
   onSendQuickChat?: (text: string) => void;
+}
+
+// Convert 32-bit Float PCM to 16-bit Int PCM Base64
+function pcmToBase64(float32Array: Float32Array): string {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  let binary = '';
+  const bytes = new Uint8Array(int16Array.buffer);
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 export default function VoiceCallModal({
@@ -25,13 +40,30 @@ export default function VoiceCallModal({
   const [callState, setCallState] = useState<'RINGING' | 'CONNECTED' | 'ENDED'>('RINGING');
   const [callDuration, setCallDuration] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isSpeaker, setIsSpeaker] = useState<boolean>(false);
+  const [isSpeaker, setIsSpeaker] = useState<boolean>(true);
   const [isPlayingSimVoice, setIsPlayingSimVoice] = useState<boolean>(false);
 
-  // Audio Context Ref for ringtone & audio effects
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  // Live API States
+  const [useLiveApi, setUseLiveApi] = useState<boolean>(true);
+  const [liveStatus, setLiveStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'SPEAKING' | 'ERROR'>('DISCONNECTED');
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [userTranscript, setUserTranscript] = useState<string>('');
+  const [audioLevel, setAudioLevel] = useState<number>(0);
 
-  // Helper to trigger Web Audio synthesizer ringtone
+  // Refs for Web Audio & WebSockets
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const outputAudioCtxRef = useRef<AudioContext | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const nextStartTimeRef = useRef<number>(0);
+  const isMutedRef = useRef<boolean>(isMuted);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  // Helper to trigger Web Audio synthesizer ringtone / chime
   const playTone = (freq1: number, freq2: number, durationMs: number) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -72,15 +104,168 @@ export default function VoiceCallModal({
     }
   };
 
+  // Play audio chunk received from Gemini Live API at 24kHz
+  const playAudioChunk = (base64Pcm: string) => {
+    try {
+      if (!outputAudioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        outputAudioCtxRef.current = new AudioCtx({ sampleRate: 24000 });
+      }
+      const ctx = outputAudioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const binary = atob(base64Pcm);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const int16Array = new Int16Array(bytes.buffer);
+      const float32Array = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / (int16Array[i] < 0 ? 0x8000 : 0x7fff);
+      }
+
+      const buffer = ctx.createBuffer(1, float32Array.length, 24000);
+      buffer.getChannelData(0).set(float32Array);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+
+      const currentTime = ctx.currentTime;
+      if (nextStartTimeRef.current < currentTime) {
+        nextStartTimeRef.current = currentTime;
+      }
+      source.start(nextStartTimeRef.current);
+      nextStartTimeRef.current += buffer.duration;
+
+      setLiveStatus('SPEAKING');
+      setAudioLevel(0.8);
+      setTimeout(() => {
+        setAudioLevel(0.3);
+      }, (buffer.duration * 1000) || 500);
+    } catch (e) {
+      console.error('[Live API] Playback error:', e);
+    }
+  };
+
+  // Connect to Gemini Live API WebSocket endpoint
+  const startLiveSession = async () => {
+    try {
+      setLiveStatus('CONNECTING');
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/live`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = async () => {
+        console.log('[Live API Client] WebSocket open');
+        setLiveStatus('CONNECTED');
+
+        // Request microphone access for audio input
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = stream;
+
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const inputCtx = new AudioCtx({ sampleRate: 16000 });
+
+          const source = inputCtx.createMediaStreamSource(stream);
+          const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+          scriptProcessorRef.current = processor;
+
+          source.connect(processor);
+          processor.connect(inputCtx.destination);
+
+          processor.onaudioprocess = (e) => {
+            if (isMutedRef.current) return;
+            const float32 = e.inputBuffer.getChannelData(0);
+
+            // Compute volume energy
+            let sum = 0;
+            for (let i = 0; i < float32.length; i += 10) {
+              sum += float32[i] * float32[i];
+            }
+            const rms = Math.sqrt(sum / (float32.length / 10));
+            setAudioLevel(Math.min(1, rms * 5));
+
+            const base64Pcm = pcmToBase64(float32);
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ audio: base64Pcm }));
+            }
+          };
+        } catch (micErr) {
+          console.warn('[Live API] Microphone access denied or unavailable:', micErr);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'audio' && data.audio) {
+            playAudioChunk(data.audio);
+          } else if (data.type === 'text' && data.text) {
+            setLiveTranscript((prev) => (prev + ' ' + data.text).slice(-180));
+          } else if (data.type === 'interrupted') {
+            nextStartTimeRef.current = 0;
+            setLiveStatus('CONNECTED');
+          } else if (data.type === 'error') {
+            setLiveStatus('ERROR');
+          }
+        } catch (err) {
+          console.error('[Live API Client] Error parsing WS message:', err);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error('[Live API Client] WS error:', err);
+        setLiveStatus('ERROR');
+      };
+
+      ws.onclose = () => {
+        setLiveStatus('DISCONNECTED');
+      };
+    } catch (err) {
+      console.error('[Live API Client] Connection error:', err);
+      setLiveStatus('ERROR');
+    }
+  };
+
+  // Close Live Session and cleanup audio nodes
+  const stopLiveSession = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    if (scriptProcessorRef.current) {
+      scriptProcessorRef.current.disconnect();
+      scriptProcessorRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    setLiveStatus('DISCONNECTED');
+    setAudioLevel(0);
+  };
+
   // Ringtone interval
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      stopLiveSession();
+      return;
+    }
 
     setCallState('RINGING');
     setCallDuration(0);
     setIsMuted(false);
     setIsSpeaker(true);
     setIsPlayingSimVoice(false);
+    setLiveTranscript('');
+    setUserTranscript('');
 
     // Initial ring tone
     playTone(440, 480, 800);
@@ -93,13 +278,18 @@ export default function VoiceCallModal({
     const connectTimer = setTimeout(() => {
       clearInterval(ringInterval);
       setCallState('CONNECTED');
-      // Connected chime
       playTone(800, 1000, 200);
+
+      // Connect to Gemini 3.1 Flash Live API
+      if (useLiveApi) {
+        startLiveSession();
+      }
     }, 2800);
 
     return () => {
       clearInterval(ringInterval);
       clearTimeout(connectTimer);
+      stopLiveSession();
     };
   }, [isOpen]);
 
@@ -117,6 +307,7 @@ export default function VoiceCallModal({
   // End call handler
   const handleHangUp = () => {
     playTone(300, 200, 300);
+    stopLiveSession();
     setCallState('ENDED');
     setTimeout(() => {
       onClose();
@@ -130,7 +321,7 @@ export default function VoiceCallModal({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Simulate simulated driver voice response
+  // Simulate fallback driver voice response
   const handlePlayVoiceSim = () => {
     if (isPlayingSimVoice) {
       setIsPlayingSimVoice(false);
@@ -139,7 +330,6 @@ export default function VoiceCallModal({
     setIsPlayingSimVoice(true);
     playTone(520, 650, 1500);
 
-    // Auto finish after 4 seconds
     setTimeout(() => {
       setIsPlayingSimVoice(false);
     }, 4500);
@@ -149,23 +339,23 @@ export default function VoiceCallModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-sm bg-gradient-to-b from-zinc-900 via-zinc-950 to-black text-white rounded-3xl p-6 border border-zinc-800 shadow-2xl space-y-6 relative overflow-hidden text-center">
+      <div className="w-full max-w-sm bg-gradient-to-b from-zinc-900 via-zinc-950 to-black text-white rounded-3xl p-6 border border-zinc-800 shadow-2xl space-y-5 relative overflow-hidden text-center">
         {/* Subtle Ambient Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Uber / Bolt VoIP Badge Header */}
+        {/* Header Badge */}
         <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 border-b border-zinc-800/80 pb-3">
           <span className="flex items-center gap-1 text-emerald-400 font-extrabold uppercase tracking-wider">
             <ShieldCheck size={14} /> ZamTaxi VoIP Call
           </span>
-          <span className="bg-zinc-800/80 px-2 py-0.5 rounded text-[10px] text-zinc-300 font-semibold">
-            In-App Free Call
+          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+            <Sparkles size={11} /> Gemini 3.1 Live AI
           </span>
         </div>
 
         {/* Avatar & Pulse Wave */}
-        <div className="py-2 space-y-4">
-          <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+        <div className="py-1 space-y-3">
+          <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
             {callState === 'RINGING' && (
               <>
                 <div className="absolute inset-0 rounded-full border-2 border-emerald-500/40 animate-ping" />
@@ -173,12 +363,15 @@ export default function VoiceCallModal({
               </>
             )}
             {callState === 'CONNECTED' && (
-              <div className="absolute -inset-2 rounded-full border-2 border-emerald-500/60 animate-pulse" />
+              <div
+                className="absolute -inset-2 rounded-full border-2 border-emerald-500/60 transition-all duration-300"
+                style={{ transform: `scale(${1 + audioLevel * 0.25})` }}
+              />
             )}
             <img
               src={callerAvatar}
               alt={callerName}
-              className="w-24 h-24 rounded-full object-cover border-4 border-zinc-800 shadow-xl relative z-10"
+              className="w-20 h-20 rounded-full object-cover border-4 border-zinc-800 shadow-xl relative z-10"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -189,12 +382,12 @@ export default function VoiceCallModal({
               {callerRole} {vehicleInfo ? `• ${vehicleInfo}` : ''}
             </p>
             {phoneNumber && (
-              <p className="text-[10px] font-mono text-zinc-500 mt-1">{phoneNumber}</p>
+              <p className="text-[10px] font-mono text-zinc-500 mt-0.5">{phoneNumber}</p>
             )}
           </div>
 
           {/* Call Status & Timer */}
-          <div className="pt-1">
+          <div>
             {callState === 'RINGING' && (
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs font-extrabold text-amber-400 animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
@@ -215,45 +408,70 @@ export default function VoiceCallModal({
           </div>
         </div>
 
-        {/* Audio Waveform visualizer when connected */}
+        {/* Gemini Live API Real-Time Voice Waveform */}
         {callState === 'CONNECTED' && (
-          <div className="bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl space-y-2">
+          <div className="bg-zinc-900/90 border border-zinc-800 p-3.5 rounded-2xl space-y-2.5 text-left">
             <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-              <span>VoIP Audio Stream</span>
-              <span className="text-emerald-400 font-mono">HD Voice Active</span>
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <Radio size={12} className="animate-pulse text-emerald-400" />
+                Live API Stream (gemini-3.1-flash-live-preview)
+              </span>
+              <span className="text-[9px] font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-700/50">
+                {liveStatus === 'SPEAKING' ? 'AI Speaking' : liveStatus === 'CONNECTED' ? 'Listening...' : liveStatus}
+              </span>
             </div>
 
-            {/* Waveform graphic bars */}
-            <div className="flex items-center justify-center gap-1 h-8 px-2">
-              {[40, 75, 25, 90, 60, 30, 85, 100, 50, 70, 35, 80, 45, 95, 65].map((height, i) => (
-                <div
-                  key={i}
-                  className={`w-1 rounded-full transition-all duration-300 ${
-                    isPlayingSimVoice ? 'bg-emerald-400 animate-bounce' : 'bg-emerald-500/40'
-                  }`}
-                  style={{
-                    height: isPlayingSimVoice ? `${Math.max(15, (height * (i % 3 + 1)) % 100)}%` : `${height * 0.4}%`,
-                    animationDelay: `${i * 0.08}s`
-                  }}
-                />
-              ))}
+            {/* Audio Waveform visualizer */}
+            <div className="flex items-center justify-center gap-1 h-9 px-2 bg-black/40 rounded-xl border border-zinc-800">
+              {[35, 75, 25, 90, 60, 30, 85, 100, 50, 70, 35, 80, 45, 95, 65].map((height, i) => {
+                const activeHeight = liveStatus === 'SPEAKING' || audioLevel > 0.1
+                  ? Math.max(20, (height * (audioLevel + 0.5)) % 100)
+                  : 15;
+                return (
+                  <div
+                    key={i}
+                    className={`w-1 rounded-full transition-all duration-150 ${
+                      liveStatus === 'SPEAKING'
+                        ? 'bg-emerald-400'
+                        : audioLevel > 0.1
+                        ? 'bg-amber-400'
+                        : 'bg-zinc-700'
+                    }`}
+                    style={{
+                      height: `${activeHeight}%`,
+                    }}
+                  />
+                );
+              })}
             </div>
 
-            {/* Quick Driver/Rider Voice Simulation Button */}
+            {/* Real-time Transcription Stream */}
+            <div className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 min-h-[44px] text-xs font-medium text-zinc-300 space-y-1">
+              <span className="text-[9px] font-bold text-zinc-500 uppercase block tracking-wider flex items-center gap-1">
+                <Activity size={10} className="text-emerald-400" /> Real-time Transcription
+              </span>
+              {liveTranscript ? (
+                <p className="text-emerald-300 text-[11px] leading-relaxed italic">"{liveTranscript}"</p>
+              ) : (
+                <p className="text-zinc-500 text-[11px] italic">Speak into your microphone to talk with Gemini 3.1 Voice AI...</p>
+              )}
+            </div>
+
+            {/* Simulation Voice Trigger */}
             <button
               type="button"
               onClick={handlePlayVoiceSim}
-              className="w-full py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {isPlayingSimVoice ? (
                 <>
                   <Square size={12} className="fill-emerald-300" />
-                  Playing Voice Message...
+                  Playing Audio Response...
                 </>
               ) : (
                 <>
                   <Play size={12} className="fill-emerald-300" />
-                  Play {callerRole} Voice Message ("I'm at the gate!")
+                  Test Simulated {callerRole} Chime ("I'm arriving!")
                 </>
               )}
             </button>
@@ -261,7 +479,7 @@ export default function VoiceCallModal({
         )}
 
         {/* Interactive Call Controls */}
-        <div className="grid grid-cols-3 gap-3 pt-2">
+        <div className="grid grid-cols-3 gap-3 pt-1">
           {/* Mute Mic */}
           <button
             type="button"
@@ -309,7 +527,7 @@ export default function VoiceCallModal({
         </div>
 
         {/* Big Red Hang Up Button */}
-        <div className="pt-2">
+        <div className="pt-1">
           <button
             type="button"
             onClick={handleHangUp}

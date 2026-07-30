@@ -1,6 +1,6 @@
 {
   "name": "Zamfara State Taxi Service",
   "description": "An interactive, official Zamfara State Taxi (ZamTaxi) ride-sharing simulation featuring realistic passenger and driver modes, dynamic live maps of Gusau, real-time dispatch, and driver chat.",
-  "requestFramePermissions": ["geolocation"],
+  "requestFramePermissions": ["geolocation", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
