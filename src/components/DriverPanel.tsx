@@ -820,6 +820,15 @@ export default function DriverPanel({
               </span>
             </div>
 
+            <div className="bg-emerald-950/60 p-3 rounded-xl border border-emerald-500/30 text-xs text-left space-y-1">
+              <span className="font-extrabold text-emerald-300 uppercase tracking-wider block text-[10.5px]">
+                Low-Barrier Vehicle Acquisition
+              </span>
+              <p className="text-[11px] text-zinc-300 font-medium leading-relaxed">
+                To promote green mobility across Nigeria, the government provides a 30% grant subsidy for commercial driver onboarding.
+              </p>
+            </div>
+
             <div className="grid grid-cols-3 gap-2 text-center text-[10px] bg-black/30 p-2.5 rounded-xl border border-white/10 font-mono">
               <div>
                 <span className="block text-zinc-400 text-[8.5px] uppercase">Subsidy Rate</span>

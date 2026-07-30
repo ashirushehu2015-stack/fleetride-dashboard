@@ -35,7 +35,12 @@ import {
   ShieldCheck,
   PieChart as PieIcon,
   BarChart3,
-  Download
+  Download,
+  Filter,
+  Users,
+  User,
+  RotateCcw,
+  SlidersHorizontal
 } from 'lucide-react';
 import { Trip, VehicleType } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVERS, MOCK_PASSENGERS } from '../data';
@@ -461,6 +466,102 @@ export function DashboardDisplayScreen({
   onShowMap: () => void;
 }) {
   const [activeMetric, setActiveMetric] = useState<'line' | 'revenue' | 'rides'>('line');
+
+  // Filters for Trip History View within DashboardDisplayScreen
+  const [startDateFilter, setStartDateFilter] = useState<string>('');
+  const [endDateFilter, setEndDateFilter] = useState<string>('');
+  const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>('ALL');
+  const [selectedPassengerFilter, setSelectedPassengerFilter] = useState<string>('ALL');
+  const [activePreset, setActivePreset] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
+
+  // Available unique driver names
+  const availableDriverNames = useMemo(() => {
+    const namesSet = new Set<string>();
+    MOCK_DRIVERS.forEach((d) => namesSet.add(d.name));
+    completedTrips.forEach((t) => {
+      if (t.driver?.name) namesSet.add(t.driver.name);
+    });
+    return Array.from(namesSet).sort();
+  }, [completedTrips]);
+
+  // Available unique passenger names
+  const availablePassengerNames = useMemo(() => {
+    const namesSet = new Set<string>();
+    MOCK_PASSENGERS.forEach((p) => namesSet.add(p.name));
+    completedTrips.forEach((t) => {
+      if (t.passengerName) namesSet.add(t.passengerName);
+    });
+    return Array.from(namesSet).sort();
+  }, [completedTrips]);
+
+  // Date range quick preset setter
+  const setQuickPreset = (preset: 'ALL' | 'TODAY' | '7DAYS' | '30DAYS') => {
+    setActivePreset(preset);
+    const today = new Date();
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    if (preset === 'ALL') {
+      setStartDateFilter('');
+      setEndDateFilter('');
+    } else if (preset === 'TODAY') {
+      const todayStr = formatDate(today);
+      setStartDateFilter(todayStr);
+      setEndDateFilter(todayStr);
+    } else if (preset === '7DAYS') {
+      const past = new Date();
+      past.setDate(today.getDate() - 7);
+      setStartDateFilter(formatDate(past));
+      setEndDateFilter(formatDate(today));
+    } else if (preset === '30DAYS') {
+      const past = new Date();
+      past.setDate(today.getDate() - 30);
+      setStartDateFilter(formatDate(past));
+      setEndDateFilter(formatDate(today));
+    }
+  };
+
+  const resetTripFilters = () => {
+    setStartDateFilter('');
+    setEndDateFilter('');
+    setSelectedDriverFilter('ALL');
+    setSelectedPassengerFilter('ALL');
+    setActivePreset('ALL');
+  };
+
+  // Filtered trips computation
+  const filteredTrips = useMemo(() => {
+    return completedTrips.filter((trip) => {
+      // Driver filter
+      if (selectedDriverFilter !== 'ALL' && trip.driver?.name !== selectedDriverFilter) {
+        return false;
+      }
+
+      // Passenger filter
+      if (selectedPassengerFilter !== 'ALL') {
+        const pName = trip.passengerName || 'Standard Passenger';
+        if (pName !== selectedPassengerFilter) {
+          return false;
+        }
+      }
+
+      // Date range filter
+      if (startDateFilter || endDateFilter) {
+        const tripDate = trip.timestamp ? new Date(trip.timestamp) : new Date();
+        if (!isNaN(tripDate.getTime())) {
+          if (startDateFilter) {
+            const start = new Date(`${startDateFilter}T00:00:00`);
+            if (tripDate < start) return false;
+          }
+          if (endDateFilter) {
+            const end = new Date(`${endDateFilter}T23:59:59.999`);
+            if (tripDate > end) return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  }, [completedTrips, selectedDriverFilter, selectedPassengerFilter, startDateFilter, endDateFilter]);
 
   // 1. Calculate dynamic statistics
   const stats = useMemo(() => {
@@ -1212,14 +1313,173 @@ export function DashboardDisplayScreen({
         {/* SECTION 6: RECENT TRIPS & AUDIT LOGS */}
         {(activeSection === 'all' || activeSection === 'trips') && (
           <div className="space-y-3 text-left">
-            <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2">
+            <div className="flex flex-wrap items-center justify-between border-b border-[#E5DFD3] pb-2 gap-2">
               <h3 className="text-xs font-extrabold uppercase text-zinc-700 tracking-wider flex items-center gap-2">
                 <Clock size={15} className="text-emerald-700" />
                 Recent Trips & Live Activity Audit
               </h3>
-              <span className="text-[10px] text-zinc-600 font-bold font-mono">
-                {completedTrips.length} Total Logged Journeys
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-emerald-800 font-extrabold bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 font-mono">
+                  {filteredTrips.length} of {completedTrips.length} Logged Journeys
+                </span>
+              </div>
+            </div>
+
+            {/* DATE RANGE & DRIVER / PASSENGER FILTER CONTROLS BAR */}
+            <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl p-3.5 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-[#E5DFD3]/70 pb-2">
+                <div className="flex items-center gap-1.5 text-zinc-800">
+                  <SlidersHorizontal size={14} className="text-emerald-700" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider">Audit & History Filters</span>
+                </div>
+                {(startDateFilter || endDateFilter || selectedDriverFilter !== 'ALL' || selectedPassengerFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={resetTripFilters}
+                    className="text-[10px] font-extrabold text-rose-600 hover:text-rose-800 flex items-center gap-1 transition cursor-pointer"
+                    id="btn-reset-trip-filters"
+                  >
+                    <RotateCcw size={11} />
+                    <span>Reset Filters</span>
+                  </button>
+                )}
+              </div>
+
+              {/* FILTER INPUTS GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                {/* START DATE PICKER */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-600 uppercase flex items-center gap-1">
+                    <Calendar size={11} className="text-emerald-700" />
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDateFilter}
+                    onChange={(e) => {
+                      setStartDateFilter(e.target.value);
+                      setActivePreset('ALL');
+                    }}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs"
+                    id="input-trip-start-date"
+                  />
+                </div>
+
+                {/* END DATE PICKER */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-600 uppercase flex items-center gap-1">
+                    <Calendar size={11} className="text-emerald-700" />
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => {
+                      setEndDateFilter(e.target.value);
+                      setActivePreset('ALL');
+                    }}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs"
+                    id="input-trip-end-date"
+                  />
+                </div>
+
+                {/* DRIVER DROPDOWN */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-600 uppercase flex items-center gap-1">
+                    <Car size={11} className="text-emerald-700" />
+                    Filter Driver
+                  </label>
+                  <select
+                    value={selectedDriverFilter}
+                    onChange={(e) => setSelectedDriverFilter(e.target.value)}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs cursor-pointer"
+                    id="select-trip-driver-filter"
+                  >
+                    <option value="ALL">All Drivers ({availableDriverNames.length})</option>
+                    {availableDriverNames.map((driverName) => (
+                      <option key={driverName} value={driverName}>
+                        {driverName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* PASSENGER DROPDOWN */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-zinc-600 uppercase flex items-center gap-1">
+                    <User size={11} className="text-emerald-700" />
+                    Filter Passenger
+                  </label>
+                  <select
+                    value={selectedPassengerFilter}
+                    onChange={(e) => setSelectedPassengerFilter(e.target.value)}
+                    className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs cursor-pointer"
+                    id="select-trip-passenger-filter"
+                  >
+                    <option value="ALL">All Passengers ({availablePassengerNames.length})</option>
+                    {availablePassengerNames.map((passengerName) => (
+                      <option key={passengerName} value={passengerName}>
+                        {passengerName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* QUICK DATE PRESETS ROW */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-[#E5DFD3]/70">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-extrabold uppercase text-zinc-500 mr-1">Quick Range:</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPreset('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      activePreset === 'ALL'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white border border-[#E5DFD3] text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPreset('TODAY')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      activePreset === 'TODAY'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white border border-[#E5DFD3] text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPreset('7DAYS')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      activePreset === '7DAYS'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white border border-[#E5DFD3] text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    Last 7 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPreset('30DAYS')}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      activePreset === '30DAYS'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white border border-[#E5DFD3] text-zinc-700 hover:bg-zinc-100'
+                    }`}
+                  >
+                    Last 30 Days
+                  </button>
+                </div>
+
+                <div className="text-[10px] font-bold text-zinc-500 font-mono">
+                  Active Filter Match: <span className="font-extrabold text-emerald-800">{filteredTrips.length} rides</span>
+                </div>
+              </div>
             </div>
 
             {completedTrips.length === 0 ? (
@@ -1230,9 +1490,24 @@ export function DashboardDisplayScreen({
                   Book a trip in Rider Mode or click "Add Simulated Ride" in the control panel to populate this live screen!
                 </p>
               </div>
+            ) : filteredTrips.length === 0 ? (
+              <div className="py-10 text-center border-2 border-dashed border-[#E5DFD3] rounded-xl bg-[#FAF7F2] p-4">
+                <Filter size={24} className="mx-auto text-amber-600 mb-2" />
+                <h5 className="text-xs font-extrabold text-zinc-900">No trips match current filters</h5>
+                <p className="text-[10px] text-zinc-600 font-medium max-w-[280px] mx-auto mt-1">
+                  Try adjusting your start/end dates, driver selection, or passenger filter to view matching trips.
+                </p>
+                <button
+                  type="button"
+                  onClick={resetTripFilters}
+                  className="mt-3 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer"
+                >
+                  Clear All Filters
+                </button>
+              </div>
             ) : (
-              <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
-                {completedTrips
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {filteredTrips
                   .slice()
                   .reverse()
                   .map((trip) => {
@@ -1250,19 +1525,21 @@ export function DashboardDisplayScreen({
                           })
                         : trip.timestamp)
                       : new Date().toLocaleDateString();
+                    const passengerDisplayName = trip.passengerName || 'Standard Passenger';
+
                     return (
                       <div
                         key={trip.id}
                         className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl p-3.5 flex flex-col sm:flex-row justify-between gap-3 text-xs shadow-2xs hover:border-zinc-400 transition"
                       >
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 min-w-0">
                           <img
                             src={trip.driver.avatar}
                             alt={trip.driver.name}
                             className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#E5DFD3]"
                             referrerPolicy="no-referrer"
                           />
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-extrabold text-zinc-900">{trip.driver.name}</span>
                               <span className="text-[9px] bg-zinc-900 text-white px-1.5 py-0.5 rounded font-mono font-bold uppercase shrink-0">
@@ -1280,9 +1557,16 @@ export function DashboardDisplayScreen({
                               {trip.origin.label} → {trip.destination.label}
                             </p>
 
-                            <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-mono mt-1 font-semibold">
-                              <Clock size={10} className="text-zinc-500" />
-                              <span>{formattedDate}</span>
+                            <div className="flex items-center gap-3 text-[10px] text-zinc-600 mt-1 font-semibold flex-wrap">
+                              <span className="flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-[#E5DFD3] text-zinc-800">
+                                <User size={10} className="text-emerald-700" />
+                                Passenger: <strong className="text-zinc-900">{passengerDisplayName}</strong>
+                              </span>
+
+                              <span className="flex items-center gap-1 font-mono text-[9px] text-zinc-500">
+                                <Clock size={10} className="text-zinc-500" />
+                                {formattedDate}
+                              </span>
                             </div>
 
                             {trip.review && (
@@ -1304,7 +1588,6 @@ export function DashboardDisplayScreen({
                             <button
                               type="button"
                               onClick={() => {
-                                onShowMap();
                                 onReplayTrip(trip);
                               }}
                               className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-extrabold rounded-lg flex items-center gap-1 transition cursor-pointer shadow-2xs mt-1"

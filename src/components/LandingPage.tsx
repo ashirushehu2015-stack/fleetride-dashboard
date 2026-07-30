@@ -796,7 +796,7 @@ export default function LandingPage({
               <div className="p-5 space-y-2 text-left">
                 <h4 className="font-extrabold text-base text-zinc-900">Official State Taxi (Abuja & Gusau)</h4>
                 <p className="text-zinc-600 text-xs font-medium leading-relaxed">
-                  Modern green electric sedan deployed across Gusau, Talata Mafara, and Kaura Namoda. Equipped with GPS telematics and climate control.
+                  Modern green electric sedan deployed across Nigeria. Equipped with GPS telematics and climate control.
                 </p>
               </div>
             </div>
@@ -1284,8 +1284,17 @@ export default function LandingPage({
               </h4>
 
               <p className="text-zinc-800 text-sm sm:text-base leading-relaxed font-semibold">
-                Empowering local drivers with 100% electric taxis, zero fuel overhead, government-backed micro-financing, and flexible daily returns across Gusau, Talata Mafara, Kaura Namoda, and interstate corridors.
+                Empowering local drivers with 100% electric taxis, zero fuel overhead, government-backed micro-financing, and flexible daily returns across Nigeria.
               </p>
+
+              <div className="bg-emerald-100/80 border border-emerald-300 p-3.5 rounded-xl text-left space-y-1">
+                <span className="text-xs font-black text-emerald-950 uppercase block tracking-wider">
+                  Low-Barrier Vehicle Acquisition
+                </span>
+                <p className="text-xs text-emerald-900 font-bold leading-relaxed">
+                  To promote green mobility across Nigeria, the state government provides a 30% grant subsidy for commercial driver onboarding.
+                </p>
+              </div>
             </div>
 
             {/* High Contrast Key Metrics */}

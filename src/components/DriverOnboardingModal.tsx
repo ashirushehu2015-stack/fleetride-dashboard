@@ -413,9 +413,14 @@ export default function DriverOnboardingModal({
                 <CreditCard size={20} className="text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-extrabold text-white text-sm">Step 2: Select Commercial EV & Micro-Financing Plan</h4>
-                  <p className="text-zinc-400 text-[11px] mt-0.5 leading-relaxed">
-                    Zamfara State Government covers <strong>30% of the vehicle cost</strong> as a clean energy subsidy. Repayments are micro-deducted directly from daily ride earnings.
-                  </p>
+                  <div className="mt-1.5 p-2.5 bg-emerald-900/30 border border-emerald-500/30 rounded-xl space-y-0.5">
+                    <span className="text-[11px] font-black text-emerald-300 block uppercase tracking-wider">
+                      Low-Barrier Vehicle Acquisition
+                    </span>
+                    <p className="text-zinc-300 text-[11px] leading-relaxed font-medium">
+                      To promote green mobility across Nigeria, the government provides a 30% grant subsidy for commercial driver onboarding. Repayments are micro-deducted directly from daily ride earnings.
+                    </p>
+                  </div>
                 </div>
               </div>
 
