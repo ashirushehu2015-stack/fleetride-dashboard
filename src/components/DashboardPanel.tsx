@@ -34,7 +34,8 @@ import {
   LayoutDashboard,
   ShieldCheck,
   PieChart as PieIcon,
-  BarChart3
+  BarChart3,
+  Download
 } from 'lucide-react';
 import { Trip, VehicleType } from '../types';
 import { VEHICLE_CONFIGS, MOCK_DRIVERS, MOCK_PASSENGERS } from '../data';
@@ -602,9 +603,86 @@ export function DashboardDisplayScreen({
     ];
   }, [completedTrips]);
 
+  // 6. Revenue Share Distribution Breakdown (Percentage-based split model)
+  const revenueDistributionData = useMemo(() => {
+    const totalRev = stats.revenue;
+    return [
+      { name: 'Driver Share', percentage: 75, color: '#047857', amount: totalRev * 0.75, description: 'Direct Earnings for Drivers' },
+      { name: 'Company Operations', percentage: 15, color: '#2563eb', amount: totalRev * 0.15, description: 'Fleet Maintenance & Expansion' },
+      { name: 'Platform Service Fee', percentage: 8, color: '#7c3aed', amount: totalRev * 0.08, description: 'Cloud, Server & App Tech' },
+      { name: 'Admin Governance Pool', percentage: 2, color: '#f59e0b', amount: totalRev * 0.02, description: 'Governance & Emergency Reserve' }
+    ];
+  }, [stats.revenue]);
+
+  // CSV Export Generator for Financial Distribution
+  const handleDownloadFinancialCSV = () => {
+    if (!completedTrips || completedTrips.length === 0) {
+      alert("No completed trips available to export.");
+      return;
+    }
+
+    const headers = [
+      "Trip ID",
+      "Driver Name",
+      "Passenger Name",
+      "Vehicle Type",
+      "Distance (km)",
+      "Duration (mins)",
+      "Total Fare (NGN)",
+      "Driver Share 75% (NGN)",
+      "Company Share 15% (NGN)",
+      "Platform Fee 8% (NGN)",
+      "Admin Pool 2% (NGN)",
+      "Status",
+      "Timestamp"
+    ];
+
+    const rows = completedTrips.map((trip) => {
+      const fare = trip.price || 0;
+      const driverShare = (fare * 0.75).toFixed(2);
+      const companyShare = (fare * 0.15).toFixed(2);
+      const platformFee = (fare * 0.08).toFixed(2);
+      const adminPool = (fare * 0.02).toFixed(2);
+      const driverName = trip.driver?.name || 'Unassigned Driver';
+      const passengerName = trip.passengerName || 'Passenger';
+      const vehicleType = trip.vehicleType || 'Standard';
+      const distance = (trip.distanceMiles || 0).toFixed(2);
+      const duration = trip.durationMinutes || 0;
+      const status = trip.status || 'COMPLETED';
+      const timestamp = trip.timestamp ? new Date(trip.timestamp).toISOString() : new Date().toISOString();
+
+      return [
+        `"${trip.id}"`,
+        `"${driverName.replace(/"/g, '""')}"`,
+        `"${passengerName.replace(/"/g, '""')}"`,
+        `"${vehicleType}"`,
+        distance,
+        duration,
+        fare.toFixed(2),
+        driverShare,
+        companyShare,
+        platformFee,
+        adminPool,
+        `"${status}"`,
+        `"${timestamp}"`
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `trips_financial_distribution_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-[#E5DFD3] shadow-xl overflow-hidden min-h-[550px]">
-      {/* SCREEN HEADER WITH SWITCH TO MAP TOGGLE */}
+      {/* SCREEN HEADER WITH SWITCH TO MAP TOGGLE AND CSV DOWNLOAD */}
       <div className="p-3.5 bg-[#FAF7F2] border-b border-[#E5DFD3] flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
@@ -628,8 +706,19 @@ export function DashboardDisplayScreen({
           </div>
         </div>
 
-        {/* TOGGLE TO MAP VIEW */}
+        {/* HEADER ACTIONS */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadFinancialCSV}
+            className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+            id="download-financial-csv-btn"
+            title="Download CSV report of completed trips and financial distributions"
+          >
+            <Download size={13} />
+            <span>Export CSV Report</span>
+          </button>
+
           <button
             type="button"
             onClick={onShowMap}
@@ -812,6 +901,152 @@ export function DashboardDisplayScreen({
                     </AreaChart>
                   )}
                 </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REVENUE SHARE BREAKDOWN DONUT CHART VISUALIZATION */}
+        {(activeSection === 'all' || activeSection === 'revenue' || activeSection === 'overview') && (
+          <div className="bg-[#FAF7F2] border border-[#E5DFD3] rounded-2xl p-4 text-left space-y-4 shadow-2xs">
+            <div className="flex flex-wrap items-center justify-between border-b border-[#E5DFD3] pb-2.5 gap-2">
+              <div>
+                <h4 className="font-extrabold text-xs text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <PieIcon size={15} className="text-emerald-700" />
+                  Revenue Share & Stakeholder Distribution Model
+                </h4>
+                <p className="text-[10px] text-zinc-600 font-medium mt-0.5">
+                  Automated percentage allocation of total gross fare revenue across system stakeholders
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 font-mono">
+                  Formula: 75% | 15% | 8% | 2%
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDownloadFinancialCSV}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                  id="card-download-csv-btn"
+                  title="Export Financial Breakdown CSV"
+                >
+                  <Download size={11} />
+                  <span>Download CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              {/* Recharts Donut Chart Canvas */}
+              <div className="md:col-span-5 h-[220px] relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={revenueDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={4}
+                      dataKey="percentage"
+                    >
+                      {revenueDistributionData.map((entry, index) => (
+                        <Cell key={`rev-cell-${index}`} fill={entry.color} stroke="#FAF7F2" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-zinc-950 text-white p-3 rounded-xl shadow-xl text-xs space-y-1 font-sans border border-zinc-800">
+                              <div className="font-black text-emerald-400 text-xs border-b border-zinc-800 pb-1 flex items-center justify-between gap-3">
+                                <span>{data.name}</span>
+                                <span className="text-amber-300 font-mono font-bold">{data.percentage}%</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-300 font-medium pt-1">
+                                Revenue Allocation: <span className="font-mono text-white font-black">₦{Math.round(data.amount).toLocaleString()}</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-400 italic">
+                                {data.description}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Donut Center Overlay Label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Gross Pool</span>
+                  <span className="text-xs font-black font-mono text-zinc-900">
+                    ₦{Math.round(stats.revenue).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Stakeholder Breakdown Legend List */}
+              <div className="md:col-span-7 space-y-2">
+                {revenueDistributionData.map((item) => (
+                  <div
+                    key={item.name}
+                    className="p-2.5 bg-white border border-[#E5DFD3] rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-zinc-400 transition"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="w-3.5 h-3.5 rounded-md shrink-0 shadow-2xs"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <div className="min-w-0 text-left">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-zinc-900 text-xs truncate">{item.name}</span>
+                          <span className="text-[10px] font-mono font-extrabold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
+                            {item.percentage}%
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="font-black text-xs font-mono text-zinc-900">
+                        ₦{Math.round(item.amount).toLocaleString()}
+                      </div>
+                      <div className="text-[9px] font-bold text-emerald-700">
+                        Share of Fares
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 1000 NGN Example Formula Banner */}
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between text-xs gap-2">
+              <div className="flex items-center gap-2 text-emerald-900">
+                <DollarSign size={16} className="text-emerald-700 shrink-0" />
+                <span className="font-extrabold text-[11px]">
+                  Example Revenue Share per ₦1,000 Fare:
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap font-mono text-[11px] font-black">
+                <span className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300">
+                  Driver: ₦750
+                </span>
+                <span className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded border border-blue-300">
+                  Company: ₦150
+                </span>
+                <span className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded border border-purple-300">
+                  Platform: ₦80
+                </span>
+                <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                  Admin: ₦20
+                </span>
               </div>
             </div>
           </div>

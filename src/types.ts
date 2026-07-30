@@ -105,7 +105,12 @@ export interface UserProfile {
   vehicleName?: string;
   plateNumber?: string;
   phone?: string;
+  email?: string;
   completedTrips?: number;
+  is2FAEnabled?: boolean;
+  twoFactorMethod?: 'SMS' | 'TOTP' | 'EMAIL';
+  twoFactorPhone?: string;
+  twoFactorSecret?: string;
 }
 
 export interface UserFeedback {

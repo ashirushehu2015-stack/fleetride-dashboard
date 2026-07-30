@@ -32,6 +32,7 @@ import { Location, VehicleType, UserProfile } from '../types';
 import { CITIES, VEHICLE_CONFIGS } from '../data';
 import ZamTaxiLogo from './ZamTaxiLogo';
 import DriverOnboardingModal from './DriverOnboardingModal';
+import TwoFactorAuthModal from './TwoFactorAuthModal';
 // @ts-ignore
 import zamtaxiFront from '../assets/images/zamtaxi_front_1784738289926.jpg';
 // @ts-ignore
@@ -90,6 +91,16 @@ export default function LandingPage({
   const [authScope, setAuthScope] = useState<'all' | 'rider-only' | 'driver-only' | 'admin-only'>('rider-only');
   const [loginRole, setLoginRole] = useState<'rider' | 'driver' | 'admin'>('rider');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+
+  // 2FA Prompt Verification State
+  const [is2FAVerificationOpen, setIs2FAVerificationOpen] = useState(false);
+  const [pendingLoginData, setPendingLoginData] = useState<{
+    role: 'rider' | 'driver' | 'admin';
+    profile: UserProfile;
+    targetTab: 'rider' | 'driver' | 'users' | 'dashboard';
+    userPhone: string;
+    userEmail: string;
+  } | null>(null);
 
   const openAuthModal = (scope: 'all' | 'rider-only' | 'driver-only' | 'admin-only', role: 'rider' | 'driver' | 'admin', mode: 'signin' | 'signup') => {
     if (scope === 'driver-only' && mode === 'signup') {
@@ -158,7 +169,7 @@ export default function LandingPage({
     }
   };
 
-  // Perform Sign In
+  // Perform Sign In with 2FA Challenge
   const handleSignInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -173,11 +184,20 @@ export default function LandingPage({
           balance: passenger.balance || 50000.0,
           isDriver: false,
           avatar: passenger.avatar,
-          role: 'rider'
+          role: 'rider',
+          phone: passenger.phone || '+234 803 111 2233',
+          email: passenger.email || 'rider@transit.ng',
+          is2FAEnabled: true
         };
-        addAuditLog('RIDER', `${passenger.name} successfully authenticated as Active Rider via Secure Login.`);
-        onLoginSuccess('rider', uProfile, 'rider');
+        setPendingLoginData({
+          role: 'rider',
+          profile: uProfile,
+          targetTab: 'rider',
+          userPhone: uProfile.phone || '+234 803 111 2233',
+          userEmail: uProfile.email || 'rider@transit.ng'
+        });
         setIsLoginOpen(false);
+        setIs2FAVerificationOpen(true);
       }
     } else if (loginRole === 'driver') {
       const targetId = selectedPresetId || drivers[0]?.id;
@@ -187,14 +207,23 @@ export default function LandingPage({
         const uProfile: UserProfile = {
           name: driver.name,
           rating: driver.rating || 4.8,
-          balance: 0.0, // Earnings are accumulated dynamically
+          balance: 0.0,
           isDriver: true,
           avatar: driver.avatar,
-          role: 'driver'
+          role: 'driver',
+          phone: driver.phone || '+234 802 333 4455',
+          email: `${driver.name.toLowerCase().replace(/\s+/g, '')}@transit.ng`,
+          is2FAEnabled: true
         };
-        addAuditLog('DRIVER', `Driver ${driver.name} connected live container console. GPS verification complete.`);
-        onLoginSuccess('driver', uProfile, 'driver');
+        setPendingLoginData({
+          role: 'driver',
+          profile: uProfile,
+          targetTab: 'driver',
+          userPhone: uProfile.phone || '+234 802 333 4455',
+          userEmail: uProfile.email || 'driver@transit.ng'
+        });
         setIsLoginOpen(false);
+        setIs2FAVerificationOpen(true);
       }
     } else {
       const targetId = selectedPresetId || admins[0]?.id;
@@ -204,16 +233,37 @@ export default function LandingPage({
         const uProfile: UserProfile = {
           name: admin.name,
           rating: 5.0,
-          balance: 250000.0, // Admin buffer balance
+          balance: 250000.0,
           isDriver: false,
           avatar: admin.avatar,
-          role: 'admin'
+          role: 'admin',
+          phone: '+234 800 000 9999',
+          email: admin.email || 'admin@nigeria.gov.ng',
+          is2FAEnabled: true
         };
-        addAuditLog('ADMIN', `Administrator ${admin.name} entered Super Admin workspace. Access token dispatched.`);
-        onLoginSuccess('admin', uProfile, 'users');
+        setPendingLoginData({
+          role: 'admin',
+          profile: uProfile,
+          targetTab: 'users',
+          userPhone: uProfile.phone || '+234 800 000 9999',
+          userEmail: uProfile.email || 'admin@nigeria.gov.ng'
+        });
         setIsLoginOpen(false);
+        setIs2FAVerificationOpen(true);
       }
     }
+  };
+
+  const handle2FAVerificationSuccess = () => {
+    if (pendingLoginData) {
+      addAuditLog(
+        pendingLoginData.role.toUpperCase() as any,
+        `[2FA PASSCODE VERIFIED] ${pendingLoginData.profile.name} completed Two-Factor Authentication challenge.`
+      );
+      onLoginSuccess(pendingLoginData.role, pendingLoginData.profile, pendingLoginData.targetTab);
+      setPendingLoginData(null);
+    }
+    setIs2FAVerificationOpen(false);
   };
 
   // Perform Registration / Sign Up
@@ -1908,6 +1958,22 @@ export default function LandingPage({
             };
             onLoginSuccess('driver', uProfile, 'driver');
             setIsDriverOnboardingOpen(false);
+          }}
+          addAuditLog={addAuditLog}
+        />
+
+        {/* 2FA LOGIN VERIFICATION MODAL */}
+        <TwoFactorAuthModal
+          isOpen={is2FAVerificationOpen}
+          mode="VERIFY"
+          userName={pendingLoginData?.profile.name || 'User'}
+          userPhone={pendingLoginData?.userPhone || '+234 803 111 2233'}
+          userEmail={pendingLoginData?.userEmail || 'user@transit.ng'}
+          userRole={pendingLoginData?.role || 'Rider'}
+          onSuccess={handle2FAVerificationSuccess}
+          onClose={() => {
+            setIs2FAVerificationOpen(false);
+            setPendingLoginData(null);
           }}
           addAuditLog={addAuditLog}
         />

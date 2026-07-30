@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
+import TwoFactorAuthModal from './TwoFactorAuthModal';
 import {
   Key,
   ShieldCheck,
@@ -14,7 +15,11 @@ import {
   Trash2,
   MessageSquare,
   Send,
-  Star
+  Star,
+  Smartphone,
+  Lock,
+  ShieldAlert,
+  KeyRound
 } from 'lucide-react';
 import { saveFeedbackToFirestore } from '../firebase';
 
@@ -48,6 +53,45 @@ export default function SettingsPanel({
   const [feedbackRating, setFeedbackRating] = useState<number>(5);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState<boolean>(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState<boolean>(false);
+
+  // 2FA Security Modal State
+  const [is2FAModalOpen, setIs2FAModalOpen] = useState<boolean>(false);
+  const [modal2FAMode, setModal2FAMode] = useState<'SETUP' | 'VERIFY'>('SETUP');
+
+  const handleToggle2FA = () => {
+    if (profile.is2FAEnabled) {
+      if (confirm('Are you sure you want to disable Two-Factor Authentication? Your account security level will be reduced.')) {
+        setProfile((prev) => ({
+          ...prev,
+          is2FAEnabled: false
+        }));
+        if (addAuditLog) {
+          addAuditLog(
+            (profile.role ? profile.role.toUpperCase() : 'RIDER') as any,
+            `2-Factor Authentication DISABLED for user ${profile.name}.`
+          );
+        }
+      }
+    } else {
+      setModal2FAMode('SETUP');
+      setIs2FAModalOpen(true);
+    }
+  };
+
+  const handleUpdate2FAState = (isEnabled: boolean, method: 'SMS' | 'TOTP' | 'EMAIL', phone: string) => {
+    setProfile((prev) => ({
+      ...prev,
+      is2FAEnabled: isEnabled,
+      twoFactorMethod: method,
+      twoFactorPhone: phone || prev.phone || '+234 803 111 2233'
+    }));
+    if (addAuditLog) {
+      addAuditLog(
+        (profile.role ? profile.role.toUpperCase() : 'RIDER') as any,
+        `2-Factor Authentication ENABLED for user ${profile.name} using ${method} channel.`
+      );
+    }
+  };
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +256,72 @@ export default function SettingsPanel({
         </div>
       </div>
 
+      {/* 3.5 Two-Factor Authentication (2FA) Security Control Panel */}
+      <div className={`p-4 rounded-xl border space-y-3 transition ${
+        profile.is2FAEnabled
+          ? 'bg-emerald-50/60 border-emerald-300'
+          : 'bg-[#FAF7F2] border-[#E5DFD3]'
+      }`}>
+        <div className="flex items-center justify-between border-b border-[#E5DFD3] pb-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl text-white ${
+              profile.is2FAEnabled ? 'bg-emerald-700' : 'bg-zinc-800'
+            }`}>
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-extrabold text-zinc-900">Two-Factor Authentication (2FA)</h4>
+                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                  profile.is2FAEnabled
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                    : 'bg-zinc-200 text-zinc-700 border-zinc-300'
+                }`}>
+                  {profile.is2FAEnabled ? 'ENABLED' : 'DISABLED'}
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-600 font-medium mt-0.5">
+                {profile.is2FAEnabled
+                  ? `Active method: ${profile.twoFactorMethod || 'SMS'} • Verified phone ${profile.twoFactorPhone || profile.phone || '+234 803 111 2233'}`
+                  : 'Add an extra layer of security to prevent unauthorized access'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggle2FA}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer shadow-2xs ${
+              profile.is2FAEnabled
+                ? 'bg-white border border-rose-200 text-rose-700 hover:bg-rose-50'
+                : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+            }`}
+            id="toggle-2fa-btn"
+          >
+            {profile.is2FAEnabled ? 'Disable 2FA' : 'Configure 2FA'}
+          </button>
+        </div>
+
+        {profile.is2FAEnabled && (
+          <div className="flex items-center justify-between pt-1 text-[11px] font-bold text-zinc-700">
+            <div className="flex items-center gap-1.5 text-emerald-800">
+              <KeyRound size={14} />
+              <span>Passcode challenge enforced on login and high-value wallet transactions.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setModal2FAMode('VERIFY');
+                setIs2FAModalOpen(true);
+              }}
+              className="text-emerald-800 underline hover:text-emerald-900 font-black cursor-pointer"
+            >
+              Test 2FA OTP Code
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* 4. Mock Balances / Promo codes */}
       <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E5DFD3] space-y-3">
         <h4 className="text-xs font-extrabold text-zinc-900">Promo codes & Mock Tokens</h4>
@@ -366,6 +476,25 @@ export default function SettingsPanel({
           </button>
         )}
       </div>
+
+      {/* Two-Factor Authentication Modal */}
+      <TwoFactorAuthModal
+        isOpen={is2FAModalOpen}
+        mode={modal2FAMode}
+        userName={profile.name}
+        userPhone={profile.twoFactorPhone || profile.phone || '+234 803 111 2233'}
+        userEmail={profile.email || `${profile.name.toLowerCase().replace(/\s+/g, '')}@transit.ng`}
+        userRole={profile.role || 'Rider'}
+        onSuccess={() => {
+          if (modal2FAMode === 'SETUP') {
+            handleUpdate2FAState(true, 'SMS', profile.twoFactorPhone || profile.phone || '+234 803 111 2233');
+          }
+          setIs2FAModalOpen(false);
+        }}
+        onClose={() => setIs2FAModalOpen(false)}
+        onUpdate2FAState={handleUpdate2FAState}
+        addAuditLog={addAuditLog}
+      />
     </div>
   );
 }
