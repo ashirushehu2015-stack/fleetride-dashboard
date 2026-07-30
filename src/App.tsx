@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Location, Trip, ChatMessage, UserProfile, TripStatus } from './types';
 import { CITIES, VEHICLE_CONFIGS, MOCK_DRIVERS, MOCK_DRIVER_CHATBOT_PHRASES } from './data';
 import MapContainer from './components/MapContainer';
@@ -286,6 +286,21 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'rider' | 'driver' | 'settings' | 'users'>('dashboard');
+
+  // Account Balance pulse animation state when trip updates balance
+  const [isBalancePulsing, setIsBalancePulsing] = useState<boolean>(false);
+  const prevBalanceRef = useRef<number>(profile.balance);
+
+  useEffect(() => {
+    if (prevBalanceRef.current !== profile.balance) {
+      setIsBalancePulsing(true);
+      const timer = setTimeout(() => {
+        setIsBalancePulsing(false);
+      }, 1500);
+      prevBalanceRef.current = profile.balance;
+      return () => clearTimeout(timer);
+    }
+  }, [profile.balance]);
 
   // Enforce access control and synchronize role to localStorage
   useEffect(() => {
@@ -1032,9 +1047,25 @@ export default function App() {
 
         {/* Secondary Navigation & Balance HUD */}
         <div className="flex items-center gap-4">
-          <div className="text-right">
-            <span className="text-[9px] uppercase font-bold text-zinc-600 tracking-wider">Account Balance</span>
-            <div className="text-emerald-700 font-extrabold text-sm">₦{profile.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div 
+            className={`text-right px-3 py-1.5 rounded-xl transition-all duration-300 border ${
+              isBalancePulsing 
+                ? 'bg-emerald-100/90 border-emerald-500/70 ring-2 ring-emerald-400/50 shadow-md animate-balance-pulse' 
+                : 'bg-[#F2EDE4]/50 border-transparent'
+            }`}
+            id="account-balance-hud"
+          >
+            <span className="text-[9px] uppercase font-bold text-zinc-600 tracking-wider flex items-center justify-end gap-1">
+              Account Balance
+              {isBalancePulsing && (
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+              )}
+            </span>
+            <div className={`text-emerald-700 font-extrabold text-sm transition-transform duration-300 ${
+              isBalancePulsing ? 'scale-105 text-emerald-800 font-black' : ''
+            }`}>
+              ₦{profile.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
 
           <button

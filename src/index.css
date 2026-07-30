@@ -12,3 +12,25 @@ body {
   font-family: var(--font-sans);
 }
 
+@keyframes balancePulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  }
+  35% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+  }
+  70% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-balance-pulse {
+  animation: balancePulse 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
