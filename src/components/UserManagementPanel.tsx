@@ -1110,11 +1110,13 @@ export default function UserManagementPanel({
                         {onReplayTrip && (
                           <button
                             onClick={() => onReplayTrip(trip)}
-                            className="px-2.5 py-1 bg-zinc-800 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1 transition cursor-pointer shadow-2xs group shrink-0 mt-0.5"
-                            title="Open map view centered specifically on this trip's route"
+                            className="h-8 px-2.5 bg-zinc-850 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg border border-zinc-750 hover:border-emerald-500 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm group shrink-0 mt-0.5"
+                            title="Open interactive map view centered on this trip's route"
                           >
-                            <Map size={12} className="group-hover:scale-110 transition-transform shrink-0" />
-                            <span className="text-[9px] font-black uppercase tracking-tight">Map</span>
+                            <div className="w-4 h-4 rounded bg-zinc-900 group-hover:bg-emerald-700/60 flex items-center justify-center shrink-0 border border-zinc-700/50">
+                              <Map size={11} className="text-emerald-400 group-hover:text-white transition-transform group-hover:scale-110" />
+                            </div>
+                            <span className="text-[9px] font-black uppercase tracking-wider">Map</span>
                           </button>
                         )}
                       </div>
