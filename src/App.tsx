@@ -1264,6 +1264,10 @@ export default function App() {
                   setSelectedUser(userId ? { id: userId, type } : null);
                   setUsersViewMode('screen');
                 }}
+                onReplayTrip={(trip) => {
+                  setUsersViewMode('map');
+                  handleReplayTrip(trip);
+                }}
               />
             ) : (
               <div className="bg-white border border-red-200 p-6 rounded-2xl text-center space-y-4 shadow-md">

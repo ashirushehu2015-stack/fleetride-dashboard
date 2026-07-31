@@ -22,6 +22,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Map,
   ArrowUpRight,
   DollarSign,
   ArrowLeft,
@@ -436,10 +437,10 @@ export default function UserManagementDisplayScreen({
                         : new Date().toLocaleDateString();
 
                       return (
-                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs">
-                          <div>
-                            <span className="font-extrabold text-zinc-900">{trip.origin.label} → {trip.destination.label}</span>
-                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5">
+                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs gap-3">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-extrabold text-zinc-900 block truncate">{trip.origin.label} → {trip.destination.label}</span>
+                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5 truncate">
                               Driver: <span className="font-bold text-zinc-800">{trip.driver.name}</span> ({trip.vehicleType}) • {trip.distanceMiles}km
                             </div>
                             <div className="text-[10px] text-emerald-800 font-mono mt-1 font-semibold flex items-center gap-1.5">
@@ -447,9 +448,21 @@ export default function UserManagementDisplayScreen({
                               <span>{formattedDate}</span>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                            <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right">
+                              <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                              <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                            </div>
+                            {onReplayTrip && (
+                              <button
+                                onClick={() => onReplayTrip(trip)}
+                                className="px-2.5 py-1.5 bg-zinc-900 hover:bg-emerald-700 text-emerald-400 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1.5 transition cursor-pointer shadow-2xs group shrink-0"
+                                title="Open map view centered specifically on this trip's route"
+                              >
+                                <Map size={13} className="group-hover:scale-110 transition-transform shrink-0" />
+                                <span className="text-[10px] font-black uppercase tracking-tight">Map</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -576,10 +589,10 @@ export default function UserManagementDisplayScreen({
                         : new Date().toLocaleDateString();
 
                       return (
-                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs">
-                          <div>
-                            <span className="font-extrabold text-zinc-900">{trip.origin.label} → {trip.destination.label}</span>
-                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5">
+                        <div key={trip.id} className="p-3 bg-[#FAF7F2] border border-[#E5DFD3] rounded-xl flex items-center justify-between text-xs hover:border-zinc-400 transition shadow-2xs gap-3">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-extrabold text-zinc-900 block truncate">{trip.origin.label} → {trip.destination.label}</span>
+                            <div className="text-[10px] text-zinc-600 font-mono mt-0.5 truncate">
                               Passenger: <span className="font-bold text-zinc-800">{trip.passengerName}</span> • {trip.vehicleType} • {trip.distanceMiles}km
                             </div>
                             <div className="text-[10px] text-sky-800 font-mono mt-1 font-semibold flex items-center gap-1.5">
@@ -587,9 +600,21 @@ export default function UserManagementDisplayScreen({
                               <span>{formattedDate}</span>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                            <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right">
+                              <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                              <div className="text-[9px] text-zinc-500 font-mono font-bold mt-0.5">{trip.durationMinutes} mins</div>
+                            </div>
+                            {onReplayTrip && (
+                              <button
+                                onClick={() => onReplayTrip(trip)}
+                                className="px-2.5 py-1.5 bg-zinc-900 hover:bg-sky-700 text-sky-400 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1.5 transition cursor-pointer shadow-2xs group shrink-0"
+                                title="Open map view centered specifically on this trip's route"
+                              >
+                                <Map size={13} className="group-hover:scale-110 transition-transform shrink-0" />
+                                <span className="text-[10px] font-black uppercase tracking-tight">Map</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1000,9 +1025,21 @@ export default function UserManagementDisplayScreen({
                             </div>
                           )}
                         </div>
-                        <div className="text-right">
-                          <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                          <div className="text-[9px] text-zinc-500 font-mono">{trip.distanceMiles}km • {trip.durationMinutes}m</div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="text-right">
+                            <div className="font-black text-emerald-700 font-mono">₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[9px] text-zinc-500 font-mono">{trip.distanceMiles}km • {trip.durationMinutes}m</div>
+                          </div>
+                          {onReplayTrip && (
+                            <button
+                              onClick={() => onReplayTrip(trip)}
+                              className="px-2.5 py-1.5 bg-zinc-900 hover:bg-emerald-700 text-emerald-400 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1.5 transition cursor-pointer shadow-2xs group shrink-0"
+                              title="Open map view centered specifically on this trip's route"
+                            >
+                              <Map size={13} className="group-hover:scale-110 transition-transform shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-tight">Map</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

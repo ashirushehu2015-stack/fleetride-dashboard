@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   Calendar,
   Clock,
-  MapPin
+  MapPin,
+  Map
 } from 'lucide-react';
 import { VehicleType, UserProfile, Trip } from '../types';
 import { filterTripsForPassenger, filterTripsForDriver, generatePassengerHistoricalTrips } from '../utils/tripHelpers';
@@ -87,6 +88,7 @@ interface UserManagementPanelProps {
   onSelectSubTab?: (st: 'passengers' | 'drivers' | 'admins' | 'control' | 'trips') => void;
   selectedUserId?: string | null;
   onSelectUser?: (userId: string | null, type: 'passenger' | 'driver' | 'admin') => void;
+  onReplayTrip?: (trip: Trip) => void;
 }
 
 export default function UserManagementPanel({
@@ -110,7 +112,8 @@ export default function UserManagementPanel({
   subTab: propsSubTab,
   onSelectSubTab,
   selectedUserId,
-  onSelectUser
+  onSelectUser,
+  onReplayTrip
 }: UserManagementPanelProps) {
   const [internalSubTab, setInternalSubTab] = useState<'passengers' | 'drivers' | 'admins' | 'control' | 'trips'>('passengers');
   const subTab = propsSubTab !== undefined ? propsSubTab : internalSubTab;
@@ -1097,13 +1100,23 @@ export default function UserManagementPanel({
                         </div>
                       </div>
 
-                      <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-zinc-900">
+                      <div className="text-right flex sm:flex-col justify-between sm:justify-center items-center sm:items-end shrink-0 border-t sm:border-none pt-2 sm:pt-0 border-zinc-900 gap-1.5">
                         <div className="font-extrabold text-emerald-500 text-sm">
                           ₦{trip.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
-                        <div className="text-[9px] text-zinc-500 font-mono mt-0.5">
+                        <div className="text-[9px] text-zinc-500 font-mono">
                           {trip.distanceMiles}km • {trip.durationMinutes}m
                         </div>
+                        {onReplayTrip && (
+                          <button
+                            onClick={() => onReplayTrip(trip)}
+                            className="px-2.5 py-1 bg-zinc-800 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg border border-zinc-700 flex items-center gap-1 transition cursor-pointer shadow-2xs group shrink-0 mt-0.5"
+                            title="Open map view centered specifically on this trip's route"
+                          >
+                            <Map size={12} className="group-hover:scale-110 transition-transform shrink-0" />
+                            <span className="text-[9px] font-black uppercase tracking-tight">Map</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

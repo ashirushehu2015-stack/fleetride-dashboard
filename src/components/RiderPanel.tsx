@@ -2866,17 +2866,101 @@ export default function RiderPanel({
                 </div>
               )}
 
-              {/* Progress Bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[11px] font-bold text-zinc-600 uppercase tracking-wider">
-                  <span>Trip Progress</span>
-                  <span className="text-zinc-900 font-extrabold">{Math.round(trip.progress * 100)}%</span>
+              {/* Active Trip Trajectory & Circular Progress Bar */}
+              <div className="bg-[#FAF7F2] border border-[#E5DFD3] p-4 rounded-2xl shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span className="text-xs font-black uppercase text-zinc-900 tracking-wider">
+                        Trip Trajectory Progress
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 font-medium">
+                      {trip.status === 'TRIP_IN_PROGRESS'
+                        ? 'Live vehicle tracking along route trajectory'
+                        : 'En route to pickup / waiting location'}
+                    </p>
+                  </div>
+                  
+                  <span className="text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full border border-emerald-300 shadow-2xs">
+                    {Math.round(trip.progress * 100)}% Complete
+                  </span>
                 </div>
-                <div className="w-full bg-[#F2EDE4] rounded-full h-2.5 overflow-hidden border border-[#E5DFD3]">
-                  <div
-                    className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${trip.progress * 100}%` }}
-                  />
+
+                <div className="flex items-center gap-4 bg-white p-3.5 rounded-xl border border-[#E5DFD3] shadow-2xs">
+                  {/* Circular Progress Bar Component */}
+                  <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 96 96">
+                      {/* Outer Track */}
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="38"
+                        className="text-zinc-100"
+                        strokeWidth="8"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                      {/* Progress Arc */}
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="38"
+                        className="text-emerald-600 transition-all duration-500 ease-out"
+                        strokeWidth="8"
+                        strokeDasharray={238.76}
+                        strokeDashoffset={238.76 * (1 - Math.min(1, Math.max(0, trip.progress)))}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                    </svg>
+                    {/* Inner Content overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <span className="text-lg font-black text-zinc-900 leading-none">
+                        {Math.round(trip.progress * 100)}%
+                      </span>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter mt-1">
+                        Trajectory
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Trajectory Details */}
+                  <div className="flex-1 space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b border-zinc-100 pb-1.5">
+                      <span className="text-zinc-500 font-semibold text-[11px]">Est. Remaining Time</span>
+                      <span className="font-extrabold text-zinc-900 font-mono">
+                        {Math.max(1, Math.round(trip.durationMinutes * (1 - trip.progress)))} mins
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-b border-zinc-100 pb-1.5">
+                      <span className="text-zinc-500 font-semibold text-[11px]">Est. Remaining Distance</span>
+                      <span className="font-extrabold text-zinc-900 font-mono">
+                        {(trip.distanceMiles * (1 - trip.progress)).toFixed(1)} km
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-500 font-semibold text-[11px]">Trajectory Status</span>
+                      <span className="font-bold text-emerald-700 text-[11px] flex items-center gap-1">
+                        <Navigation size={12} className="animate-pulse text-emerald-600" />
+                        Active Route
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary Linear Progress Bar */}
+                <div className="space-y-1 pt-0.5">
+                  <div className="w-full bg-[#F2EDE4] rounded-full h-2 overflow-hidden border border-[#E5DFD3]">
+                    <div
+                      className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${trip.progress * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
